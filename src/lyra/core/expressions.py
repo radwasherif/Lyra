@@ -113,6 +113,9 @@ class ExpressionVisitor(metaclass=ABCMeta):
     Adapted from `ast.py`.
     """
     def visit(self, expr, *args, **kwargs):
+        # gen = _iter_child_exprs(expr)
+        # for g in gen:
+        #     print(g)
         """Visit of an expression."""
         method = 'visit_' + expr.__class__.__name__
         if hasattr(self, method):
@@ -358,6 +361,8 @@ class NegationFreeNormalExpression(ExpressionVisitor):
             lt_end = BinaryComparisonOperation(expr.typ, iter_var, op_iter_end, end)
             return BinaryBooleanOperation(expr.typ, gte_start, op_connection, lt_end)
         return expression
+
+
 """
 Atomic Expressions
 https://docs.python.org/3.4/reference/expressions.html#atoms
@@ -848,6 +853,9 @@ class BinaryOperation(Operation):
     @property
     def operator(self):
         return self._operator
+    @operator.setter
+    def operator(self, operator: Operator):
+        self._operator = operator
 
     @property
     def right(self):

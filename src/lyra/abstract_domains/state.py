@@ -68,7 +68,7 @@ class State(Lattice, metaclass=ABCMeta):
         :return: current state modified by the assignment
 
         """
-        self.big_join([deepcopy(self)._assign(lhs, rhs) for lhs in left for rhs in right])
+        self.big_join([self.copy()._assign(lhs, rhs) for lhs in left for rhs in right])
         self.result = set()  # assignments have no result, only side-effects
         return self
 
@@ -88,7 +88,7 @@ class State(Lattice, metaclass=ABCMeta):
         :return: current state modified to satisfy the assumption
 
         """
-        self.big_join([deepcopy(self)._assume(expr) for expr in condition])
+        self.big_join([self.copy()._assume(expr) for expr in condition])
         return self
 
     def before(self, pp: ProgramPoint) -> 'State':
@@ -158,7 +158,7 @@ class State(Lattice, metaclass=ABCMeta):
         :return: current state modified by the output
 
         """
-        self.big_join([deepcopy(self)._output(expr) for expr in output])
+        self.big_join([self.copy()._output(expr) for expr in output])
         self.result = set()  # outputs have no result, only side-effects
         return self
 
@@ -188,6 +188,14 @@ class State(Lattice, metaclass=ABCMeta):
         :return: current state modified by the substitution
 
         """
-        self.big_join([deepcopy(self)._substitute(l, r) for l in left for r in right])
+        self.big_join([self.copy()._substitute(l, r) for l in left for r in right])
         self.result = set()  # assignments have no result, only side-effects
         return self
+
+
+    def copy(self) -> 'State':
+        """
+
+        :return: a deep copy, or an equivalent, of the current state
+        """
+        return deepcopy(self)

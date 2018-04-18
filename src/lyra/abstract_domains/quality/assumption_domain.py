@@ -8,7 +8,7 @@ from copy import deepcopy
 from typing import List
 
 import math
-
+import sys, traceback
 from lyra.abstract_domains.numerical.interval_domain import IntervalState, IntervalLattice
 from lyra.abstract_domains.quality.assumption_lattice import TypeLattice, AssumptionLattice, \
     InputAssumptionLattice, MultiInputAssumptionLattice
