@@ -22,8 +22,9 @@ import gc
 
 class Elina:
 
-    def __init__(self, dim):
+    def __init__(self, dim: int, rev_dict: dict):
         self.dim = dim
+        self.rev_dict = rev_dict
         self.man = opt_oct_manager_alloc()
         self.abstract = self.top()
         self.equalize()
@@ -48,6 +49,31 @@ class Elina:
 
     def is_leq(self, other):
         return elina_abstract0_is_leq(self.man, self.abstract, other.abstract)
+
+    def join(self, other):
+        # self.print_constraints("self before join")
+        # other.print_constraints("other before join")
+        self.abstract = elina_abstract0_join(self.man, False, self.abstract, other.abstract)
+        self.equalize()
+        # self.print_constraints("after join")
+
+
+    #TODO: might want to change right to Expression/BinaryArithmeticOperation
+    def substitute(self, vi: int, vars: [int], signs: [int], c: int):
+        print(f"inside substitution {vi, vars, signs, c}")
+        linexpr = self.create_linexpr(vars, signs, c)
+        elina_linexpr0_print(linexpr, None)
+        # print(vi, vj, c)
+        self.abstract = elina_abstract0_substitute_linexpr(self.man, False, self.abstract, ElinaDim(vi), linexpr, None)
+        self.equalize()
+        # self.print_constraints("substitute")
+
+    def widening(self, other):
+        self.abstract = elina_abstract0_widening(self.man, self.abstract, other.abstract)
+        self.equalize()
+        self.print_constraints("widening")
+
+
 
     def create_linexpr(self, var, sign, c):
         """
@@ -89,30 +115,6 @@ class Elina:
         self.equalize()
         self.print_constraints("add linear constraint" + str(var) + str(sign))
 
-    def join(self, other):
-        # self.print_constraints("self before join")
-        # other.print_constraints("other before join")
-        self.abstract = elina_abstract0_join(self.man, False, self.abstract, other.abstract)
-        self.equalize()
-        # self.print_constraints("after join")
-
-
-    #TODO: might want to change right to Expression/BinaryArithmeticOperation
-    def substitute(self, vi: int, vars: [int], signs: [int], c: int):
-        print(f"inside substitution {vi, vars, signs, c}")
-        linexpr = self.create_linexpr(vars, signs, c)
-        elina_linexpr0_print(linexpr, None)
-        # print(vi, vj, c)
-        self.abstract = elina_abstract0_substitute_linexpr(self.man, False, self.abstract, ElinaDim(vi), linexpr, None)
-        self.equalize()
-        # self.print_constraints("substitute")
-
-    def widening(self, other):
-        self.abstract = elina_abstract0_widening(self.man, self.abstract, other.abstract)
-        self.equalize()
-        self.print_constraints("widening")
-
-
     def equalize(self):
         self.lincons_array = elina_abstract0_to_lincons_array(self.man, self.abstract)
 
@@ -120,62 +122,9 @@ class Elina:
         print(message)
         elina_lincons0_array_print(self.lincons_array, None)
         print("-----------------------------------------------------------")
-    #
-    # def __str__(self):
-    #     return self.__repr__()
-    #
-    # def __repr__(self):
-    #     lincons_array = self.lincons_array
-    #     string = ""
-    #     # print("In REPR")
-    #     elina_lincons0_array_print(lincons_array, None)
-    #     if(self.is_top()):
-    #         return "TOP"
-    #     if(self.is_bottom()):
-    #         return "BOTTOM"
-    #     counter = 0
-    #     # print (lincons_array.size)
-    #     for j in range(lincons_array.size):
-    #         lincons = lincons_array.p[j]
-    #         # print("outer loop " + str(counter))
-    #         counter+=1
-    #
-    #         # c = lincons.linexpr0.contents.cst
-    #         # print (lincons.linexpr0.contents.cst.val.scalar.contents.val.dbl)
-    #         #elina_scalar_fprint(cstdout, lincons.linexpr0.cst.val.scalar)
-    #         for i in range(lincons.linexpr0.contents.size):
-    #             # print("inner " + str(i))
-    #             linterm = lincons.linexpr0.contents.p.linterm[i]
-    #             string += ("x" + str(linterm.dim))
-    #             coeff = linterm.coeff
-    #             string += (" + " if coeff == 1 else " - ")
-    #             # print(string)
-    #         if lincons.constyp == ElinaConstyp.ELINA_CONS_SUPEQ:
-    #             string += " >= "
-    #             # print(string)
-    #         elif lincons.constyp == ElinaConstyp.ELINA_CONS_SUP:
-    #             string += " > "
-    #             # print(string)
-    #         elif lincons.constyp == ElinaConstyp.ELINA_CONS_EQ:
-    #             string += " = "
-    #             # print(string)
-    #         string += str(lincons.linexpr0.contents.cst.val.scalar.contents.val.dbl)
-    #         string += "\n"
-    #     # print(string)
-    #     # print(type(string))
-    #     return string
 
-
-class OctagonDomain(State):
-    def __init__(self, variables: List[VariableIdentifier]):
-        self.variables = variables
-        self.dict = self.generate_dict()
-        self.rev_dict = {v: k for k, v in self.dict.items()}
-        # print(self.rev_dict)
-        self.elina = Elina(dim=len(variables))
-
-    def __repr__(self):
-        lincons_array = self.elina.lincons_array
+    def to_string (self):
+        lincons_array = self.lincons_array
         string = ""
         # print("In OCT REPR")
         # elina_lincons0_array_print(lincons_array, None)
@@ -216,6 +165,18 @@ class OctagonDomain(State):
         # print(string)
         # print(type(string))
         return string
+
+
+class OctagonDomain(State):
+    def __init__(self, variables: List[VariableIdentifier]):
+        self.variables = variables
+        self.dict = self.generate_dict()
+        self.rev_dict = {v: k for k, v in self.dict.items()}
+        # print(self.rev_dict)
+        self.elina = Elina(dim=len(variables), rev_dict= self.rev_dict)
+
+    def __repr__(self):
+        return self.elina.to_string()
 
 
     def generate_dict(self):
@@ -297,43 +258,32 @@ class OctagonDomain(State):
         copy.elina = self.elina.copy()
         return copy
 
+    # ==================================================
+    #             HELPER FUNCTIONS
+    # ==================================================
+
     def check_expressions(self, left: Expression, right: Expression):
         """
 
         :param left:
         :param right:
-        :return: 1 if vi <- c, 2 if vi <- vj + c, 3 if vi <- c + vj, 0 otherwise
+        :return:
 
         """
         print(f"left {left}, right {right}")
         vi, vj, c, = None, None, None
-        var_ids, signs, c = normalize_arithmetic(right)
+        var_ids, signs, c = self.normalize_arithmetic(right)
         if isinstance(left, VariableIdentifier):
             vi = self.dict[left.name]
             if len(var_ids) > 1:
                 raise ValueError(f"For now we only support substitution with at most one variable, {right} doesn't work")
             vars = [self.dict[id.name] for id in var_ids]
-        # if isinstance(left, VariableIdentifier):
-        #     #if assignment is of the form v <- c
-        #     if isinstance(right, Literal) and isinstance(right.typ, IntegerLyraType):
-        #         vi, vj, c = self.dict[left.name], None, int(right.val)
-        #     elif isinstance(right, BinaryArithmeticOperation):
-        #         #if assignment is of the form v <- v + c
-        #         if isinstance(right.right, VariableIdentifier) and isinstance(right.left, Literal) and isinstance(right.left.typ, IntegerLyraType):
-        #             vi, vj, c = self.dict[left.name], self.dict[right.right.name], int(right.left.val)
-        #         #if assignment is of the form v <- c + v
-        #         if isinstance(right.left, VariableIdentifier) and isinstance(right.right, Literal) and isinstance(
-        #                 right.left.typ, IntegerLyraType):
-        #             vi, vj, c = self.dict[left.name], self.dict[right.left.name], int(right.right.val)
-        #     elif isinstance(right, VariableIdentifier):
-        #             vi, vj, c = self.dict[left.name], self.dict[right.name], None
-
         return vi, vars[:1], signs[:1], c
 
 
     def check_condition(self, condition: Expression):
         '''
-        So far only checking for expression of the form x + y (op) c
+        So far only checking for expression of the form x + y [comparison operator] c
         :param condition: condition to be checked
         :return:
         '''
@@ -344,51 +294,48 @@ class OctagonDomain(State):
         # print(Expression._walk(normal_condition))
         vars, signs = [], []
         expr = normal_condition.left # x + y - c
-        var_ids, signs, c = normalize_arithmetic(expr)
+        var_ids, signs, c = self.normalize_arithmetic(expr)
         # print(f"Normalized arithmetic expression {expr}")
         vars = [self.dict[id.name] for id in var_ids]
         return vars, signs, c
 
-def normalize_arithmetic(expr: Expression):
-    """
+    def normalize_arithmetic(self, expr: Expression):
+        """
 
-    :param expr: Linear expression with 1 coefficients and any number of constant terms
-    :return: new expression of the form ((+/-v1) + (+/-v2) + (+/-v3) + ... ) + C, where C = sum of all constants in expr
-    """
-    vars, signs = flatten_expr(expr, 1)
-    constant = 0
-    idx_to_del = []
-    #calculate the total sum of all constants (Literals)
-    for i, v in enumerate(vars):
-        if(isinstance(v, Literal)):
-            constant += (signs[i] * (int(v.val)))
-            idx_to_del.append(i)
+        :param expr: Linear expression with 1 coefficients and any number of constant terms
+        :return: new expression of the form ((+/-v1) + (+/-v2) + (+/-v3) + ... ) + C, where C = sum of all constants in         expr
+        """
+        vars, signs = self.flatten_expr(expr, 1)
+        constant = 0
+        idx_to_del = []
+        #calculate the total sum of all constants (Literals)
+        for i, v in enumerate(vars):
+            if(isinstance(v, Literal)):
+                constant += (signs[i] * (int(v.val)))
+                idx_to_del.append(i)
 
-    #remove Literals from array so that only variables remain
-    for i in sorted(idx_to_del, reverse=True):
-        del vars[i]
-        del signs[i]
+        #remove Literals from array so that only variables remain
+        for i in sorted(idx_to_del, reverse=True):
+            del vars[i]
+            del signs[i]
 
-    if len(vars) > 2:
-        raise ValueError("Expression should have only 2 variables")
-    # if(len(vars) >= 1):
-    #     ll = UnaryArithmeticOperation(IntegerLyraType, UnaryArithmeticOperation.Operator.Add if signs[0] == 1 else UnaryArithmeticOperation.Operator.Sub, vars[0])
-    # if(len(vars) == 2):
-    #     lr = UnaryArithmeticOperation(IntegerLyraType, UnaryArithmeticOperation.Operator.Add if signs[1] == 1 else UnaryArithmeticOperation.Operator.Sub, vars[1])
-    #     left = BinaryArithmeticOperation(IntegerLyraType, ll, BinaryArithmeticOperation.Operator.Add, lr)
-    # else:
-    #     left = ll
-    # literal = Literal(IntegerLyraType, str(abs(constant)))
-    # C = UnaryArithmeticOperation(IntegerLyraType, UnaryArithmeticOperation.Operator.Sub if constant < 0 else UnaryArithmeticOperation.Operator.Add, literal)
-    return vars, signs, constant
+        if len(vars) > 2:
+            raise ValueError("Expression should have only 2 variables")
+        return vars, signs, constant
 
-def flatten_expr(expr: Expression, sign: int):
-    if isinstance(expr, VariableIdentifier) or isinstance(expr, Literal):
-        return [expr], [sign]
-    if isinstance(expr, BinaryArithmeticOperation):
-        expr_right, sign_right = flatten_expr(expr.left, sign)
-        expr_left, sign_left = flatten_expr(expr.right,
-                                            sign if expr.operator == BinaryArithmeticOperation.Operator.Add else -sign)
-        return expr_right + expr_left, sign_right + sign_left
-    if isinstance(expr, UnaryArithmeticOperation):
-        return flatten_expr(expr.expression, sign if expr.operator == UnaryArithmeticOperation.Operator.Add else -sign)
+    def flatten_expr(self, expr: Expression, sign: int):
+        """
+        
+        :param expr: Expression to be flattened
+        :param sign: Keeping track of the sign of the current expression
+        :return: array of VariableIdentifier and Literal, array of signs that correspond to each VariableIdentifier/Literal, 1 for positive, -1 for negative
+        """
+        if isinstance(expr, VariableIdentifier) or isinstance(expr, Literal):
+            return [expr], [sign]
+        if isinstance(expr, BinaryArithmeticOperation):
+            expr_right, sign_right = self.flatten_expr(expr.left, sign)
+            expr_left, sign_left = self.flatten_expr(expr.right,
+                                                sign if expr.operator == BinaryArithmeticOperation.Operator.Add else -sign)
+            return expr_right + expr_left, sign_right + sign_left
+        if isinstance(expr, UnaryArithmeticOperation):
+            return self.flatten_expr(expr.expression, sign if expr.operator == UnaryArithmeticOperation.Operator.Add else -sign)
