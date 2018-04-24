@@ -1,5 +1,5 @@
 a: int = int(input())
 b: int = int(input())
-if a >= b:
+if a > b:
     raise ValueError
 
