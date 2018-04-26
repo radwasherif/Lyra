@@ -6,7 +6,6 @@ import subprocess
 from lyra.quality_analysis.input_checker import InputChecker, ErrorInformation
 from lyra.quality_analysis.input_correction_view import InputCorrection
 from lyra.quality_analysis.json_handler import JSONHandler
-from lyra.quality_analysis.run_analysis import QualityAnalysisRunner
 
 
 class DataQualityController:
@@ -114,6 +113,7 @@ class DataQualityController:
         input_file.close()
         p = subprocess.run(run_command, stdout=subprocess.PIPE, input=input_data, encoding="utf-8")
         return [p.stdout]
+
 
 if __name__ == "__main__":
     DataQualityController().run()

@@ -325,7 +325,7 @@ class OctagonDomain(State):
 
     def flatten_expr(self, expr: Expression, sign: int):
         """
-        
+
         :param expr: Expression to be flattened
         :param sign: Keeping track of the sign of the current expression
         :return: array of VariableIdentifier and Literal, array of signs that correspond to each VariableIdentifier/Literal, 1 for positive, -1 for negative

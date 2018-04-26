@@ -11,7 +11,7 @@ from lyra.core.expressions import VariableIdentifier, LengthIdentifier
 from lyra.quality_analysis.input_assmp_simplification import CheckerRelation, \
     CheckerAssumption, CheckerMultiAssumption, CheckerExpression, CheckerLengthIdentifier, \
     CheckerIdentifier, CheckerZeroIdentifier
-
+from lyra.quality_analysis.handler import ResultHandler
 
 class IdJSON:
     """Constants for the JSON encoding."""
@@ -142,13 +142,35 @@ class AssumptionDecoder(json.JSONDecoder):
         return CheckerIdentifier(int(input_id))
 
 
-class JSONHandler:
+class JSONHandler(ResultHandler):
     """
     Handles methods to create and read json files created by an assumption analysis to use them
     for the input checker.
     """
-    def __init__(self, program_path, program_name):
-        self.filename = f"{program_path}{program_name}.json"
+
+    def write_result(self):
+        input_assmps, inputs = self.process_result()
+        self.input_assumptions_to_json(input_assmps, inputs)
+
+    def read_result(self):
+        data, inputs = self.json_to_input_assumptions()
+        return  data, inputs
+
+    def process_result(self):
+        for node, items in self.result.result.items():
+            print(items[0])
+
+            if node.identifier == 1:
+                input_assmps = items[0].stack_top.assmps
+
+        inputs = self.extract_inputs(input_assmps)
+        return input_assmps, inputs
+
+    def file_extension(self):
+        return ".json"
+    # ================================================
+    #             HELPER FUNCTIONS
+    # ================================================
 
     def input_assumptions_to_json(self, input_assmps, inputs: Set[str]):
         """Writes the assumptions to a json file.
@@ -167,3 +189,21 @@ class JSONHandler:
             return data, inputs
         except FileNotFoundError:
             raise FileNotFoundError(f"File {self.filename} does not exist.")
+
+    def extract_inputs(self, input_assmps) -> [str]:
+        """Extracts input ids that are needed for relational constraints
+
+        :param input_assmps: assumptions to extract the inputs ids from
+        :return: list of extracted input ids
+        """
+        inputs = set()
+        for assmp in input_assmps:
+            if isinstance(assmp, MultiInputAssumptionLattice):
+                inputs.add(assmp.iterations.var.name)
+                inner_inputs = self.extract_inputs(assmp.assmps)
+                inputs.update(inner_inputs)
+            else:
+                for relation in assmp.relations.relations:
+                    inputs.add(relation.first.name)
+                    inputs.add(relation.second.name)
+        return inputs

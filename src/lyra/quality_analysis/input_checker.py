@@ -4,7 +4,7 @@ from math import inf
 from lyra.abstract_domains.quality.assumption_lattice import TypeLattice
 from lyra.quality_analysis.input_assmp_simplification import CheckerExpression, \
     CheckerAssumption, CheckerMultiAssumption, CheckerLengthIdentifier, CheckerZeroIdentifier
-
+from lyra.quality_analysis.checker import Checker
 
 class InputLocation:
     """Location of an input value"""
@@ -194,12 +194,17 @@ class ErrorInformation:
         Missing = 0
 
 
-class InputChecker:
+class InputChecker(Checker):
     """Checks an input file for errors using a JSON file created by a previously run
     assumption analysis."""
-    def __init__(self, input_file_path, input_file_name, program_name):
-        self.error_file_name = f"{input_file_path}errors_{program_name}.txt"
-        self.input_file_name = f"{input_file_path}{input_file_name}"
+
+    def main(self):
+        input_assumptions, inputs = self.read_from_file()
+        return self.check_input(input_assumptions, inputs)
+
+
+    def __init__(self):
+        super().__init__()
         self.error_file = None
         self.input_file = None
         self.inputs = {}
@@ -315,8 +320,8 @@ class InputChecker:
         :param assumptions: all assumptions
         :param inputs: list of inputs that need to be stored for relation checking
         """
-        self.error_file = open(self.error_file_name, "w")
-        self.input_file = open(self.input_file_name, "r")
+        self.error_file = open(self.error_filename, "w")
+        self.input_file = open(self.input_filename, "r")
         self.eof_reached = False
         errors = []
         self.inputs = {}
