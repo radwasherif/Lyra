@@ -1,10 +1,10 @@
 from enum import IntEnum
 from math import inf
 
-from lyra.abstract_domains.quality.assumption_lattice import TypeLattice
+from lyra.abstract_domains.quality.assumption_lattice_m import TypeLattice
 from lyra.quality_analysis.input_assmp_simplification import CheckerExpression, \
     CheckerAssumption, CheckerMultiAssumption, CheckerLengthIdentifier, CheckerZeroIdentifier
-from lyra.quality_analysis.checker import Checker
+from lyra.quality.checker import Checker
 
 class InputLocation:
     """Location of an input value"""

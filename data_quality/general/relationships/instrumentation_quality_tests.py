@@ -12,8 +12,8 @@ import unittest
 
 import time
 
-from lyra.abstract_domains.quality.assumption_domain import AssumptionState
-from lyra.abstract_domains.quality.assumption_lattice import AssumptionLattice, \
+from lyra.abstract_domains.quality.assumption_domain_m import AssumptionState
+from lyra.abstract_domains.quality.assumption_lattice_m import AssumptionLattice, \
     MultiInputAssumptionLattice
 from lyra.engine.backward import BackwardInterpreter
 from lyra.semantics.backward import DefaultBackwardSemantics

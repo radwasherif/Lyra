@@ -11,7 +11,7 @@ import os
 import unittest
 from typing import List
 
-from lyra.abstract_domains.quality.assumption_domain import AssumptionState
+from lyra.abstract_domains.quality.assumption_domain_m import AssumptionState
 from lyra.core.expressions import Identifier, LengthIdentifier
 from lyra.core.types import ListLyraType, StringLyraType
 from lyra.engine.backward import BackwardInterpreter

@@ -30,7 +30,7 @@ class Elina:
         self.equalize()
 
     def copy(self):
-        copy = Elina(self.dim)
+        copy = Elina(self.dim, self.rev_dict)
         copy.abstract =  elina_abstract0_copy(self.man, self.abstract)
         copy.equalize()
         return copy
@@ -73,6 +73,11 @@ class Elina:
         self.equalize()
         self.print_constraints("widening")
 
+    def project(self, dim: int):
+        """
+        Performs the project/forget operation of the given dimension
+        :param dim: Dimension to be forgotten
+        """
 
 
     def create_linexpr(self, var, sign, c):
@@ -167,6 +172,11 @@ class Elina:
         return string
 
 
+
+    def dim_to_pp(self, dim, pp):
+        self.rev_dict[dim] = pp
+
+
 class OctagonDomain(State):
     def __init__(self, variables: List[VariableIdentifier]):
         self.variables = variables
@@ -259,12 +269,12 @@ class OctagonDomain(State):
         return copy
 
     # ==================================================
-    #             HELPER FUNCTIONS
+    #             HEURISTICS
     # ==================================================
 
     def check_expressions(self, left: Expression, right: Expression):
         """
-
+            Checks if left and right expressions make a valid substitution.
         :param left:
         :param right:
         :return:

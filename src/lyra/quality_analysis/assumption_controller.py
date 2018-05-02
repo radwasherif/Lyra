@@ -1,5 +1,5 @@
 import os
-from lyra.quality_analysis.controller import Controller
+from lyra.quality.controller import Controller
 from lyra.engine.quality.assumption_analysis import AssumptionAnalysis
 from lyra.quality_analysis.input_checker import InputChecker
 from lyra.quality_analysis.json_handler import JSONHandler

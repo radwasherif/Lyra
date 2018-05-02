@@ -3,7 +3,7 @@ from json import JSONDecoder
 from typing import Set
 
 from lyra.abstract_domains.numerical.interval_domain import IntervalLattice
-from lyra.abstract_domains.quality.assumption_lattice import AssumptionLattice, TypeLattice, \
+from lyra.abstract_domains.quality.assumption_lattice_m import AssumptionLattice, TypeLattice, \
     InputAssumptionLattice, MultiInputAssumptionLattice
 from lyra.abstract_domains.quality.simple_relation_lattice import SimpleExpression, \
     SimpleRelationsLattice, SimpleRelation
@@ -11,7 +11,7 @@ from lyra.core.expressions import VariableIdentifier, LengthIdentifier
 from lyra.quality_analysis.input_assmp_simplification import CheckerRelation, \
     CheckerAssumption, CheckerMultiAssumption, CheckerExpression, CheckerLengthIdentifier, \
     CheckerIdentifier, CheckerZeroIdentifier
-from lyra.quality_analysis.handler import ResultHandler
+from lyra.quality.handler import ResultHandler
 
 class IdJSON:
     """Constants for the JSON encoding."""

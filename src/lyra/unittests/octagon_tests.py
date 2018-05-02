@@ -13,7 +13,7 @@ import unittest
 from lyra.engine.backward import BackwardInterpreter
 from lyra.semantics.backward import DefaultBackwardSemantics
 
-from lyra.abstract_domains.numerical.octagon import OctagonDomain
+from lyra.abstract_domains.numerical.octagon_d import OctagonDomain
 from lyra.unittests.runner import TestRunner
 
 

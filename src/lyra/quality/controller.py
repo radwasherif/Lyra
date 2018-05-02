@@ -4,10 +4,10 @@
     A controller class responsible for running data quality analysis, checkers and outputting results
 
 """
-from abc import ABCMeta, abstractmethod
+from abc import ABCMeta
 from lyra.engine.runner import Runner
-from lyra.quality_analysis.checker import Checker
-from lyra.quality_analysis.handler import ResultHandler
+from lyra.quality.checker import Checker
+from lyra.quality.handler import ResultHandler
 
 
 class Controller (metaclass= ABCMeta):

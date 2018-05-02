@@ -13,7 +13,7 @@ import math
 import time
 
 from lyra.abstract_domains.numerical.interval_domain import IntervalState
-from lyra.abstract_domains.quality.assumption_lattice import TypeLattice, AssumptionLattice, \
+from lyra.abstract_domains.quality.assumption_lattice_m import TypeLattice, AssumptionLattice, \
     InputAssumptionLattice, MultiInputAssumptionLattice
 from lyra.abstract_domains.stack import Stack
 from lyra.abstract_domains.state import State
