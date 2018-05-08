@@ -15,8 +15,10 @@ from lyra.core.expressions import VariableIdentifier
 from lyra.abstract_domains.lattice import Lattice
 from lyra.core.utils import copy_docstring
 
+from abc import ABCMeta, abstractmethod
 
-class Store(Lattice):
+
+class Store(Lattice, metaclass=ABCMeta):
     """Mutable element of a store ``Var -> L``,
     lifting a lattice ``L`` to a set of program variables ``Var``.
 
@@ -107,3 +109,11 @@ class Store(Lattice):
         for var in self.store:
             self.store[var].widening(other.store[var])
         return self
+
+    @abstractmethod
+    def add_variable(self, variable: VariableIdentifier):
+        """Add variable to the store mapped to a default element"""
+
+    @abstractmethod
+    def remove_variable(self, variable: VariableIdentifier):
+        """Removes variable from store"""

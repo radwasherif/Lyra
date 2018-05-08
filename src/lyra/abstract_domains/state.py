@@ -199,3 +199,5 @@ class State(Lattice, metaclass=ABCMeta):
         :return: a deep copy, or an equivalent, of the current state
         """
         return deepcopy(self)
+
+   

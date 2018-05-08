@@ -162,6 +162,7 @@ class IntervalState(Store, State):
     .. automethod:: IntervalState._substitute
 
     """
+
     def __init__(self, variables: List[VariableIdentifier]):
         """Map each program variable to the interval representing its value.
 
@@ -272,6 +273,11 @@ class IntervalState(Store, State):
                 return self
         raise NotImplementedError(f"Substitution for {left} = {right} is not yet implemented!")
 
+    def add_variable(self, variable: VariableIdentifier):
+        self.store[variable] = IntervalLattice()
+
+    def remove_variable(self, variable: VariableIdentifier):
+        self.store.pop(variable)
     # expression evaluation
 
     class ExpressionEvaluation(ExpressionVisitor):

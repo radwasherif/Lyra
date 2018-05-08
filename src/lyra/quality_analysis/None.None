@@ -1,36 +1,6 @@
 [
-    [
-        {
-            "type_assmp": "Int",
-            "range_assmp": [
-                -Infinity,
-                Infinity
-            ],
-            "relations": [],
-            "id": ".ID=1"
-        },
-        {
-            "type_assmp": "Int",
-            "range_assmp": [
-                -Infinity,
-                Infinity
-            ],
-            "relations": [
-                {
-                    "rel_this_pos": true,
-                    "rel_this_id": ".ID=1",
-                    "rel_other_pos": false,
-                    "rel_other_id": ".ID=2",
-                    "rel_constant": 0
-                }
-            ],
-            "id": ".ID=2"
-        }
-    ],
+    [],
     {
-        "inputs": [
-            ".ID=2",
-            ".ID=1"
-        ]
+        "inputs": []
     }
 ]
