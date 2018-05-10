@@ -5,15 +5,15 @@ from lyra.abstract_domains.lattice import Lattice
 from lyra.abstract_domains.state import State
 from lyra.abstract_domains.store import Store
 from lyra.core.expressions import Expression, VariableIdentifier
-from lyra.core.types import ListLyraType, BooleanLyraType, IntegerLyraType, FloatLyraType, StringLyraType
+from lyra.core.types import *
 
 
 class TypeState(Store, State):
 
     def __init__(self, variables: List[VariableIdentifier]):
         types = [BooleanLyraType, IntegerLyraType, FloatLyraType, StringLyraType, ListLyraType]
-        lattices = {v: TypeLattice for v in variables}
-        super(TypeState, self).__init__(variables, lattices)
+        lattices = {typ: TypeLattice for typ in types}
+        super().__init__(variables, lattices)
 
     def add_variable(self, variable: VariableIdentifier):
         pass
@@ -24,7 +24,7 @@ class TypeState(Store, State):
     def _assign(self, left: Expression, right: Expression) -> 'TypeState':
         pass
 
-    #TODO implement assume for type
+    #TODO implement assume for type_element
     def _assume(self, condition: Expression) -> 'TypeState':
         pass
 
@@ -48,77 +48,70 @@ class TypeState(Store, State):
         return self
 
     def _substitute(self, left: Expression, right: Expression) -> 'TypeState':
-        self.store[left].element.substitute(right.typ)
+        self.store[left].substitute(right.typ)
         return self
+
+    def get_type(self, variable: VariableIdentifier) -> 'Type':
+        return self.store[variable].get_type(variable)
 
 
 class TypeLattice(Lattice):
 
-    class Type(IntEnum):
-        """
-            Type enum.
-        """
-        __order__ = "Any String Float Int Bool"
-        Any = 4
-        String = 3
-        Float = 2
-        Int = 1
-        Bool = 0
-
-    def __init__(self, type: Type):
+    def __init__(self, type_element=None):
         super().__init__()
-        if type is not None:
-            self.element = type
+        self.types = [BooleanLyraType, IntegerLyraType, FloatLyraType, StringLyraType, AnyLyraType]
+        if type_element is not None:
+            self.type_element = type_element
         else:
-            self = self.top()
-        self.type_map = {
-            any: TypeLattice.Type.Any,
-            str: TypeLattice.Type.String,
-            float: TypeLattice.Type.Float,
-            int: TypeLattice.Type.Int,
-            bool: TypeLattice.Type.Bool
-        }
+            self.top()
 
     def __repr__(self):
-        return self.element.name
-
-    def max_type(self):
-        return max([t for t in TypeLattice.Type])
-
-    @property
-    def min_type(self):
-        return min([t for t in TypeLattice.Type])
+        return repr(self.type_element)
+    #
+    # def max_type(self):
+    #     return max([t for t in TypeLattice.Type])
+    #
+    # @property
+    # def min_type(self):
+    #     return min([t for t in TypeLattice.Type])
 
     def bottom(self):
-        self.replace(TypeLattice(self.min_type))
+        self.replace(TypeLattice(self.types[0]))
         return self
 
     def top(self):
-        self.replace(TypeLattice(self.max_type))
+        self.replace(TypeLattice(self.types[-1]))
+        print(self.type_element)
         return self
 
     def is_bottom(self) -> bool:
-        return self.element == self.min_type
+        return self.type_element == self.types[0]
 
     def is_top(self) -> bool:
-        return self.element == self.max_type
+        return self.type_element == self.types[-1]
 
     def _less_equal(self, other: 'TypeLattice') -> bool:
-        return self.element <= other.element
+        return self.types.index(self.type_element) <= other.types.index(self.type_element)
 
     def _join(self, other: 'TypeLattice') -> 'TypeLattice':
-        self.replace(TypeLattice(max(self.element, other.element)))
+        idx1 = self.types.index(self.type_element)
+        idx2 = self.types.index(self.type_element)
+        self.replace(TypeLattice(self.types[max(idx1, idx2)]))
         return self
 
     def _meet(self, other: 'TypeLattice') -> 'TypeLattice':
-        self.replace(TypeLattice(min(self.element, other.element)))
+        idx1 = self.types.index(self.type_element)
+        idx2 = self.types.index(self.type_element)
+        self.replace(TypeLattice(self.types[min(idx1, idx2)]))
         return self
 
     def _widening(self, other: 'TypeLattice') -> 'TypeLattice':
         return self._join(other)
 
-    def substitute(self, type):
-        self.element = self.type_map[type]
+    def substitute(self, type_element):
+        self.type_element = type_element
+        return self
 
-
+    def get_type(self, variable: VariableIdentifier):
+        return self.type_element
 

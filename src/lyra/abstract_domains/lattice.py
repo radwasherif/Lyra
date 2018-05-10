@@ -11,6 +11,7 @@ from abc import ABCMeta, abstractmethod
 from enum import Enum
 from functools import reduce
 from typing import List
+from copy import deepcopy
 
 from lyra.core.utils import copy_docstring
 
@@ -193,6 +194,13 @@ class Lattice(metaclass=ABCMeta):
         """
         self.__dict__.update(other.__dict__)
         return self
+
+    def copy(self) -> 'State':
+        """
+
+        :return: a deep copy, or an equivalent, of the current state
+        """
+        return deepcopy(self)
 
 
 class KindMixin(Lattice, metaclass=ABCMeta):

@@ -14,7 +14,7 @@ from copy import deepcopy
 from typing import Set
 
 from lyra.abstract_domains.lattice import Lattice
-from lyra.core.expressions import Expression
+from lyra.core.expressions import Expression, VariableIdentifier
 from lyra.core.statements import ProgramPoint
 
 
@@ -193,11 +193,15 @@ class State(Lattice, metaclass=ABCMeta):
         return self
 
 
-    def copy(self) -> 'State':
-        """
+    @abstractmethod
+    def forget_variable(self, variable: VariableIdentifier):
+        """Forget all previously gathered information about a variable. """
 
-        :return: a deep copy, or an equivalent, of the current state
-        """
-        return deepcopy(self)
+    @abstractmethod
+    def add_variable(self, variable: VariableIdentifier):
+        """Add variable to the store mapped to a default element"""
 
-   
+
+    @abstractmethod
+    def remove_variable(self, variable: VariableIdentifier):
+        """Removes variable from store"""

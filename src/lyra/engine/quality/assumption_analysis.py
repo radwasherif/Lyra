@@ -30,7 +30,7 @@ class AssumptionAnalysis(Runner):
         return BackwardInterpreter(self.cfg, DefaultBackwardSemantics(), 3)
 
     def state(self):
-        print([v.name for v in self.variables])
+        # print([v.name for v in self.variables])
         return AssumptionState(self.variables)
 
     def run(self):

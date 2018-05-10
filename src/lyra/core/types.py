@@ -79,6 +79,11 @@ class ListLyraType(LyraType):
         return f"List[{repr(self.typ)}]"
 
 
+class AnyLyraType(LyraType):
+
+    def __repr__(self):
+        return "any"
+
 def resolve_type_annotation(annotation):
     """Type annotation resolution."""
 

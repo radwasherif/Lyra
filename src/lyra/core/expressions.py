@@ -426,6 +426,9 @@ class Identifier(Expression):
     def __str__(self):
         return "{0.name}".format(self)
 
+    def __repr__(self):
+        return self.__str__()
+
 
 class VariableIdentifier(Identifier):
     """Variable identifier representation."""

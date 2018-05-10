@@ -273,11 +273,17 @@ class IntervalState(Store, State):
                 return self
         raise NotImplementedError(f"Substitution for {left} = {right} is not yet implemented!")
 
+    def forget_variable(self, variable: VariableIdentifier):
+        val = self.store[variable].copy()
+        self.store[variable].top()
+        return val
+
     def add_variable(self, variable: VariableIdentifier):
         self.store[variable] = IntervalLattice()
 
     def remove_variable(self, variable: VariableIdentifier):
         self.store.pop(variable)
+
     # expression evaluation
 
     class ExpressionEvaluation(ExpressionVisitor):
