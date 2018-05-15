@@ -1,4 +1,5 @@
 from enum import IntEnum
+from typing import List
 
 from lyra.abstract_domains.lattice import Lattice
 from lyra.abstract_domains.state import State
@@ -97,10 +98,11 @@ class TypeLattice(State):
         return self._join(other)
 
 
-class Assumption(Lattice, metaclass=ABCMeta):
-    def __init__(self):
+class Assumption:
+    def __init__(self, id, lattice_elements: List[Lattice]):
         super().__init__()
-        self._id = None
+        self._id = id
+        self.lattice_elements = lattice_elements
 
     @property
     def id(self):
@@ -110,80 +112,8 @@ class Assumption(Lattice, metaclass=ABCMeta):
     def id(self, id):
         self._id = id
 
-
-class NumericalAssumption(Assumption):
-
-    def __init__(self):
-        super().__init__()
-        self.type = TypeLattice(None)
-        self.interval = IntervalLattice().top()
-
     def __repr__(self):
-        return f"({self.type.__repr__()}, {self.interval.__repr__()})"
-
-    def bottom(self):
-        self.type.bottom()
-        self.interval.bottom()
-        return self
-
-    def top(self):
-        self.type.top()
-        self.interval.top()
-        return self
-
-    def is_bottom(self) -> bool:
-        return self.type.is_bottom() or self.interval.is_bottom()
-
-    def is_top(self) -> bool:
-        return self.type.is_top() and self.interval.is_top()
-
-    def _less_equal(self, other: 'NumericalAssumption') -> bool:
-        return self.type._less_equal(other.type) and self.interval.less_equal(other.interval)
-
-    def _join(self, other: 'NumericalAssumption') -> 'NumericalAssumption':
-        self.type.join(other.type)
-        self.interval.join(other.interval)
-        return self
-
-    def _meet(self, other: 'NumericalAssumption'):
-        self.type.meet(other.type)
-        self.interval.meet(other.interval)
-        return self
-
-    def _widening(self, other: 'NumericalAssumption'):
-        self.type.widening(other.type)
-        self.interval.widening(other.interval)
-        return self
-
-
-class StringAssumption(Assumption):
-
-    def __repr__(self):
-        pass
-
-    def bottom(self):
-        pass
-
-    def top(self):
-        pass
-
-    def is_bottom(self) -> bool:
-        pass
-
-    def is_top(self) -> bool:
-        pass
-
-    def _less_equal(self, other: 'Lattice') -> bool:
-        pass
-
-    def _join(self, other: 'Lattice') -> 'Lattice':
-        pass
-
-    def _meet(self, other: 'Lattice'):
-        pass
-
-    def _widening(self, other: 'Lattice'):
-        pass
+        return f"(id{self.id}, {self.lattice_elements})"
 
 
 class AssumptionGraph(Lattice):
@@ -198,7 +128,7 @@ class AssumptionGraph(Lattice):
         self.is_loop = False  # indicates whether condition is a loop condition or if-statement condition: bool
 
     def __repr__(self):
-        self.repr(self)
+        return self.repr(self)
 
     def bottom(self):
         self.traverse(self, "bottom")
@@ -215,11 +145,10 @@ class AssumptionGraph(Lattice):
         pass
 
     def _less_equal(self, other: 'Lattice') -> bool:
-        pass
+        return True
 
     def _join(self, other: 'Lattice') -> 'Lattice':
-        return self.join(self, other)
-
+        pass
 
     def _meet(self, other: 'Lattice'):
         pass
@@ -233,7 +162,7 @@ class AssumptionGraph(Lattice):
     # =============================================
 
     # TODO: Not sure  how to implement this
-    def less_equal(self, this:'Lattice', other: 'Lattice'):
+    def less_equal_helper(self, this:'Lattice', other: 'Lattice'):
         if isinstance(this, Assumption) and isinstance(other, Assumption):
             return this.less_equal(other)
 
@@ -257,8 +186,8 @@ class AssumptionGraph(Lattice):
 
     def repr(self, graph):
         if isinstance(graph, Assumption):
-            return graph.__repr__()
-        return "(" + graph.mult + ", [" + ",".join([self.repr(assmp) for assmp in graph.assumptions]) + "])"
+            return repr(graph)
+        return "(" + str(graph.mult) + ", [" + ",".join([self.repr(assmp) for assmp in graph.assumptions]) + "])"
 
     def traverse(self, graph, func, *args):
         """

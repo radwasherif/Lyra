@@ -4,7 +4,7 @@ from lyra.abstract_domains.store import Store
 from lyra.abstract_domains.stack import Stack
 from lyra.abstract_domains.state import State
 from lyra.core.expressions import *
-from lyra.abstract_domains.quality.assumption_lattice import AssumptionGraph, Assumption, NumericalAssumption, StringAssumption
+from lyra.abstract_domains.quality.assumption_lattice import AssumptionGraph, Assumption
 from lyra.core.statements import ProgramPoint
 from lyra.core.types import FloatLyraType, BooleanLyraType, IntegerLyraType, StringLyraType, ListLyraType, AnyLyraType
 
@@ -23,44 +23,39 @@ class AssumptionState(State):
         self.stack = AssumptionStack(AssumptionGraph)
 
     def __repr__(self):
-        return f"types: {self.type_state}, states: {self.states}"
+        return f"types: {self.type_state}, states: {self.states}, stack: {self.stack}"
 
     def bottom(self):
         self.propagate_down("bottom")
-        self.stack.bottom()
         return self
 
     def top(self):
         self.propagate_down("top")
-        self.stack.top()
         return self
 
     def is_bottom(self) -> bool:
         _, disj = self.propagate_down("is_bottom")
-        return disj or self.stack.is_bottom()
+        return disj
 
     def is_top(self) -> bool:
         conj, _ = self.propagate_down("is_bottom")
-        return  conj and self.stack.is_top()
+        return  conj
 
     # TODO add less_equal for stack
     def _less_equal(self, other: 'AssumptionState') -> bool:
         conj, _ = self.propagate_down("_less_equal", other=other)
-        return conj and self.stack.less_equal(other.stack)
+        return conj
 
     def _join(self, other: 'AssumptionState') -> 'AssumptionState':
         self.propagate_down("_join", other=other)
-        self.stack.join(other.stack)
         return self
 
     def _meet(self, other: 'AssumptionState'):
         self.propagate_down("_meet", other=other)
-        self.stack.meet(other.stack)
         return self
 
     def _widening(self, other: 'AssumptionState'):
         self.propagate_down("_widening", other=other)
-        self.stack.widening(other.stack)
         return self
 
     def _assign(self, left: Expression, right: Expression) -> 'State':
@@ -97,31 +92,45 @@ class AssumptionState(State):
 
     def _substitute(self, left: Expression, right: Expression) -> 'State':
         old_type = self.type_state.get_type(left)
-        self.propagate_down("_substitute", left, right)
+        if isinstance(right, Input):
+            # calls substitute in different order to preserve type and assumption information
+            self.handle_input(left, right)
+        else:
+            self.propagate_down("_substitute", left, right)
         new_type = self.type_state.get_type(left)
         old_category = self.get_key(old_type)
         new_category = self.get_key(new_type)
-        print("old", old_category)
-        print("new", new_category)
         if old_category != new_category and old_category != AnyLyraType:
             self.states[old_category].remove_variable(left)
             self.states[new_category].add_variable(left)
 
-        if isinstance(right, Input):
-            self.handle_input(left)
-
         return self
+
+    def forget_variable(self, variable: VariableIdentifier):
+        pass
+
+    def add_variable(self, variable: VariableIdentifier):
+        pass
+
+    def remove_variable(self, variable: VariableIdentifier):
+        pass
+
+    # =================================================
+    #                   HEURISTICS
+    # =================================================
 
     def propagate_down(self, func: str, *args, other=None):
         if other is None:
-            disj = conj = getattr(self.type_state, func)(*args)
+            disj = getattr(self.type_state, func)(*args) or getattr(self.stack, func)(*args)
+            conj = getattr(self.type_state, func)(*args) and getattr(self.stack, func)(*args)
             for state in self.states.values():
                 result = getattr(state, func)(*args)
                 if isinstance(result, bool):
                     conj = conj and result
                     disj = disj or result
         else:
-            disj = conj = getattr(self.type_state, func)(other.type_state)
+            disj = getattr(self.type_state, func)(other.type_state) or getattr(self.stack, func)(other.stack)
+            conj = getattr(self.type_state, func)(other.type_state) and getattr(self.stack, func)(other.stack)
             for state, other_state in zip(self.states.values(), other.states.values()):
                 result = getattr(state, func)(other_state)
                 if isinstance(result, bool):
@@ -130,27 +139,32 @@ class AssumptionState(State):
         return conj, disj
 
     def get_key(self, typ: LyraType):
-        print("type",typ)
         for k, v in self.types.items():
             if type(typ) in v or typ in v:
-                print("get key",k)
                 return k
 
-
-    def handle_input(self, variable: VariableIdentifier):
+    def handle_input(self, variable: VariableIdentifier, right: Expression):
         category = self.get_key(variable.typ)
-        #store the assumption about this variable and then forget it
-        assumption = self.states[category].forget_variable(variable)
-        #associate assumption with line number
-        
-        #prepend assumption to top layer of stack
-
-        #replace every occurence of variable in stack with its line number
-
-        pass
+        # get non-type lattice element, this is lost after substitution
+        lattice_element = self.states[category].forget_variable(variable)
+        # perform substitution
+        self.propagate_down("_substitute", variable, right)
+        # get type lattice element, this is changed only after substitution
+        type_element = self.type_state.forget_variable(variable)
+        # associate assumption with line number
+        assumption = Assumption(id=self.pp.line, lattice_elements=[type_element, lattice_element])
+        # prepend assumption to top layer of stack
+        self.stack.top_layer(prepend=assumption)
+        # TODO replace every occurence of variable in stack with its line number
 
 
 class StringAssumptionState(State):
+
+    def __init__(self, variables: List[VariableIdentifier]):
+        pass
+
+    def __repr__(self):
+        return "STRING ASSUMPTION"
 
     def bottom(self):
         pass
@@ -175,12 +189,6 @@ class StringAssumptionState(State):
 
     def _widening(self, other: 'Lattice'):
         pass
-
-    def __init__(self, variables: List[VariableIdentifier]):
-        pass
-
-    def __repr__(self):
-        return "STRING ASSUMPTION"
 
     def _assign(self, left: Expression, right: Expression) -> 'State':
         pass
@@ -209,17 +217,36 @@ class StringAssumptionState(State):
     def _substitute(self, left: Expression, right: Expression) -> 'State':
         pass
 
+    def forget_variable(self, variable: VariableIdentifier):
+        pass
+
+    def add_variable(self, variable: VariableIdentifier):
+        pass
+
+    def remove_variable(self, variable: VariableIdentifier):
+        pass
+
 
 class AssumptionStack(Stack):
 
     def __init__(self, typ: AssumptionGraph):
-        super().__init__(typ)
+        super().__init__(typ, {})
 
-    def join(self, other: 'Stack'):
+    def join(self, other: 'AssumptionStack'):
+        self_top = self.stack[-1]
+        other_top = other.stack[-1]
+
+    def _assume(self, condition: Expression):
+        pass
+
+    def _substitute(self, left: Expression, right: Expression):
+        pass
+
+    def raise_error(self):
         pass
 
     def push(self):
-        self.stack.append(AssumptionGraph().bottom())
+        self.stack.append(AssumptionGraph())
         return self
 
     def pop(self):
@@ -236,10 +263,10 @@ class AssumptionStack(Stack):
     def replace(self, variable: VariableIdentifier, pp: ProgramPoint):
         pass
 
-    def top_layer(self, is_loop: bool=None, condition: Expression=None, pp: ProgramPoint=None):
+    def top_layer(self, is_loop: bool=None, condition: Expression=None, prepend:Assumption=None):
         if is_loop is not None:
             self.stack[-1].is_loop = is_loop
         if condition is not None:
             self.stack[-1].condition = condition
-        if pp is not None:
-            self.stack[-1].pp = pp
+        if prepend is not None:
+            self.stack[-1].add_assumption(prepend)

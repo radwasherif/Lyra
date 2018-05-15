@@ -87,8 +87,6 @@ class Store(Lattice, metaclass=ABCMeta):
     @copy_docstring(Lattice._less_equal)
     def _less_equal(self, other: 'Store') -> bool:
         """The comparison is performed point-wise for each variable."""
-        print(self.store)
-        print(other)
         return all(self.store[var].less_equal(other.store[var]) for var in self.store)
 
     @copy_docstring(Lattice._meet)

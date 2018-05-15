@@ -15,12 +15,6 @@ class TypeState(Store, State):
         lattices = {typ: TypeLattice for typ in types}
         super().__init__(variables, lattices)
 
-    def add_variable(self, variable: VariableIdentifier):
-        pass
-
-    def remove_variable(self, variable: VariableIdentifier):
-        pass
-
     def _assign(self, left: Expression, right: Expression) -> 'TypeState':
         pass
 
@@ -54,6 +48,17 @@ class TypeState(Store, State):
     def get_type(self, variable: VariableIdentifier) -> 'Type':
         return self.store[variable].get_type(variable)
 
+    def add_variable(self, variable: VariableIdentifier):
+        pass
+
+    def remove_variable(self, variable: VariableIdentifier):
+        pass
+
+    def forget_variable(self, variable: VariableIdentifier):
+        val = self.store[variable].copy()
+        self.store[variable].top()
+        return val
+
 
 class TypeLattice(Lattice):
 
@@ -67,13 +72,6 @@ class TypeLattice(Lattice):
 
     def __repr__(self):
         return repr(self.type_element)
-    #
-    # def max_type(self):
-    #     return max([t for t in TypeLattice.Type])
-    #
-    # @property
-    # def min_type(self):
-    #     return min([t for t in TypeLattice.Type])
 
     def bottom(self):
         self.replace(TypeLattice(self.types[0]))

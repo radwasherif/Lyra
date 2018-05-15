@@ -59,7 +59,16 @@ class Stack(BoundedLattice, metaclass=ABCMeta):
         """The comparison is performed point-wise for each stack element."""
         if len(self.stack) != len(other.stack):
             raise Exception("Stacks must be equally long")
-        return all(l.less_equal(r) for l, r in zip(self.stack, other.stack))
+        for l, r in zip(self.stack, other.stack):
+            print(l, type(l))
+            print(r, type(r))
+
+        for l, r in zip(self.stack, other.stack):
+            if l.less_equal(other=r):
+                return True
+        return False
+
+        # return all(l.less_equal(r) for l, r in zip(self.stack, other.stack))
 
     @copy_docstring(BoundedLattice._meet)
     def _meet(self, other: 'Stack'):

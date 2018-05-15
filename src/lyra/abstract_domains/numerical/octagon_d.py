@@ -268,6 +268,7 @@ class OctagonDomain(State):
         copy.elina = self.elina.copy()
         return copy
 
+
     # ==================================================
     #             HEURISTICS
     # ==================================================
