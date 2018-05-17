@@ -1,5 +1,7 @@
 
 from typing import List
+
+from lyra.abstract_domains.lattice import Lattice
 from lyra.core.expressions import *
 from lyra.abstract_domains.state import State
 from elina.python_interface.elina_auxiliary_imports import *
@@ -17,21 +19,26 @@ from elina.python_interface.elina_coeff import *
 from elina.python_interface.elina_coeff_h import *
 from elina.python_interface.elina_scalar import *
 from elina.python_interface.elina_scalar_h import *
+from elina.python_interface.elina_dimension import *
 
 import gc
 
-class Elina:
 
-    def __init__(self, dim: int, rev_dict: dict):
+class Elina(Lattice):
+
+    def __init__(self, dim: int, idx_to_varname: dict):
         self.dim = dim
-        self.rev_dict = rev_dict
+        self.idx_to_varname = idx_to_varname
         self.man = opt_oct_manager_alloc()
         self.abstract = self.top()
         self.equalize()
 
+    def __repr__(self):
+        return self.to_string()
+
     def copy(self):
-        copy = Elina(self.dim, self.rev_dict)
-        copy.abstract =  elina_abstract0_copy(self.man, self.abstract)
+        copy = Elina(self.dim, self.idx_to_varname)
+        copy.abstract = elina_abstract0_copy(self.man, self.abstract)
         copy.equalize()
         return copy
 
@@ -47,18 +54,22 @@ class Elina:
     def is_bottom(self):
         return elina_abstract0_is_bottom(self.man, self.abstract)
 
-    def is_leq(self, other):
+    def _less_equal(self, other: 'Elina'):
         return elina_abstract0_is_leq(self.man, self.abstract, other.abstract)
 
-    def join(self, other):
+    def _join(self, other: 'Elina'):
         # self.print_constraints("self before join")
         # other.print_constraints("other before join")
         self.abstract = elina_abstract0_join(self.man, False, self.abstract, other.abstract)
         self.equalize()
+        return self
         # self.print_constraints("after join")
 
+    def _meet(self, other: 'Elina'):
+        self.abstract = elina_abstract0_meet(self.man, False, self.abstract, other.abstract)
+        self.equalize()
+        return self
 
-    #TODO: might want to change right to Expression/BinaryArithmeticOperation
     def substitute(self, vi: int, vars: [int], signs: [int], c: int):
         print(f"inside substitution {vi, vars, signs, c}")
         linexpr = self.create_linexpr(vars, signs, c)
@@ -68,16 +79,11 @@ class Elina:
         self.equalize()
         # self.print_constraints("substitute")
 
-    def widening(self, other):
+    def _widening(self, other):
         self.abstract = elina_abstract0_widening(self.man, self.abstract, other.abstract)
         self.equalize()
         self.print_constraints("widening")
 
-    def project(self, dim: int):
-        """
-        Performs the project/forget operation of the given dimension
-        :param dim: Dimension to be forgotten
-        """
 
 
     def create_linexpr(self, var, sign, c):
@@ -109,16 +115,102 @@ class Elina:
         return linexpr
 
     def add_linear_constr(self, var: List[int], sign: List[int], c: int):
-        #flip signs and constant
         linexpr = self.create_linexpr(var, sign, c)
         lincons_array = elina_lincons0_array_make(1)
-        #change expression from expr <=0 to -expr >= 0
         lincons_array.p[0].constyp = ElinaConstyp.ELINA_CONS_SUPEQ
         lincons_array.p[0].linexpr0 = linexpr
         top = self.top()
         self.abstract = elina_abstract0_meet_lincons_array(self.man, False, self.abstract, lincons_array)
         self.equalize()
         self.print_constraints("add linear constraint" + str(var) + str(sign))
+
+    def add_dim(self, var_name: str):
+        """
+            Adding dimension to Elina abstract to accommodate new variable
+        :param var_name: name of the new variable to be added
+        :return:
+        """
+        # create dimchange array and add the index of the new variable to it
+        dimchange = elina_dimchange_alloc(0, 1)
+        dimchange.dim[0] = self.dim
+        # add the new dimension to Elina
+        self.abstract = elina_abstract0_add_dimensions(self.man, False, self.abstract, dimchange, False)
+        # update dictionary of Elina with the new variable
+        self.idx_to_varname[self.dim] = var_name
+        # update the number of dimensions of Elina
+        self.dim += 1
+        # equate ElinaAbstract with ElinaLinconsArray
+        self.equalize()
+
+    def remove_dim(self, dim: int):
+        """
+            Removing dimension from Elina Abstract as a result of variable being removed
+        :param dim: index of dimension to be removed
+        :return:
+        """
+        # create dimchange array with the variable to be removed
+        dimchange = elina_dimchange_alloc(0, 1)
+        dimchange.dim[0] = dim
+        # remove variable from Elina
+        self.abstract = elina_abstract0_remove_dimensions(self.man, False, self.abstract, dimchange)
+        # update dictionary (Elina index -> variable name) accordingly
+        for k,v in self.idx_to_varname.items():
+            # every index that is greater than the removed index is decremented
+            if k > dim:
+                self.idx_to_varname[k-1] = self.idx_to_varname.pop(k)
+        # equate ElinaAbstract with ElinaLinconsArray
+        self.equalize()
+
+    # TODO decide if this should be used
+    def extract_dim(self, dim:int):
+        """
+            Find all constraints in which a certain variable is involved
+        :param dim: dimension whose constraints should be returned
+        :return: new Elina object with constraints related to a certain variable
+        """
+        # call closure to make sure all possible constraints are captured
+        self.abstract = elina_abstract0_closure(self.man, False, self.abstract)
+        # equate Elina abstract with ELina lincons_array
+        self.equalize()
+        size = 0
+        # allocate new lincons_array
+        lincons_array = elina_lincons0_array_make(size)
+        print(lincons_array)
+        new_dict = {}
+        # iterate over all constraints in the lincons_array
+        for i in range(self.lincons_array.size):
+            lincons = self.lincons_array.p[i]
+            for i in range(lincons.linexpr0.contents.size):
+                linterm = lincons.linexpr0.contents.p.linterm[i]
+                cur_dim = linterm.dim
+                # if the current constraint contains the desired dimension
+                if cur_dim == dim:
+                    # increment result array by 1
+                    elina_lincons0_array_resize(lincons_array, size+1)
+                    # add copy of lincons to result array
+                    lincons_array.p[size] = elina_lincons0_copy(lincons)
+                    # increment size
+                    size += 1
+                    # create a new dictionary to be passed to the resulting elina object
+                    for j in range(lincons.linexpr0.contents.size):
+                        l = lincons.linexpr0.contents.p.linterm[i]
+                        new_dict[l.dim] = self.idx_to_varname[l.dim]
+                    break
+
+        new_elina = Elina(dim=lincons_array.size, idx_to_varname=new_dict)
+        new_elina.lincons_array = lincons_array
+        # TODO decide whether to use intdim or realdim
+        new_elina.abstract = elina_abstract0_of_lincons_array(new_elina.man, 0, size, lincons_array)
+        return new_elina
+
+
+    def project(self, dim:int):
+        """
+        Performs the project/forget operation of the given dimension
+        :param
+        """
+        self.abstract = elina_abstract0_forget_array(self.man, False, self.abstract, ElinaDim(dim), 1)
+        self.equalize()
 
     def equalize(self):
         self.lincons_array = elina_abstract0_to_lincons_array(self.man, self.abstract)
@@ -138,22 +230,15 @@ class Elina:
         if self.is_bottom():
             return "BOTTOM"
         counter = 0
-        # print(lincons_array.size)
         for j in range(lincons_array.size):
             lincons = lincons_array.p[j]
-            # print("outer loop " + str(counter))
-            counter += 1
-
-            # c = lincons.linexpr0.contents.cst
-            # print(lincons.linexpr0.contents.cst.val.scalar.contents.val.dbl)
-            # elina_scalar_fprint(cstdout, lincons.linexpr0.cst.val.scalar)
             for i in range(lincons.linexpr0.contents.size):
                 # print("inner " + str(i))
                 linterm = lincons.linexpr0.contents.p.linterm[i]
                 coeff = linterm.coeff
                 # print(f"COEFF = {coeff.val.scalar.contents.val}, {elina_coeff_equal_int(coeff, 1)}")
                 string += (" + " if elina_coeff_equal_int(coeff, 1) else " - ")
-                string += (self.rev_dict[linterm.dim])
+                string += (self.idx_to_varname[linterm.dim])
 
                 # print(string)
             if lincons.constyp == ElinaConstyp.ELINA_CONS_SUPEQ:
@@ -174,27 +259,17 @@ class Elina:
 
 
     def dim_to_pp(self, dim, pp):
-        self.rev_dict[dim] = pp
+        self.idx_to_varname[dim] = pp
 
 
 class OctagonDomain(State):
     def __init__(self, variables: List[VariableIdentifier]):
-        self.variables = variables
-        self.dict = self.generate_dict()
-        self.rev_dict = {v: k for k, v in self.dict.items()}
-        # print(self.rev_dict)
-        self.elina = Elina(dim=len(variables), rev_dict= self.rev_dict)
+        self.variables = set(variables)
+        self.varname_to_idx, idx_to_varname = self.generate_dict()
+        self.elina = Elina(dim=len(variables), idx_to_varname=idx_to_varname)
 
     def __repr__(self):
         return self.elina.to_string()
-
-
-    def generate_dict(self):
-        """
-        :return: dictionary in which every Lyra variable is mapped to an integer index to be passed to Elina
-        """
-        return {var.name: i for i, var in enumerate(set(self.variables))}
-
 
     def _assign(self, left: Expression, right: Expression) -> 'State':
         print("ASSIGN")
@@ -247,7 +322,7 @@ class OctagonDomain(State):
         return self.elina.is_top()
 
     def _less_equal(self, other: 'Lattice') -> bool:
-        return self.elina.is_leq(other.elina)
+        return self.elina.less_equal(other.elina)
 
     def _join(self, other: 'Lattice') -> 'Lattice':
         self.elina.join(other.elina)
@@ -255,7 +330,10 @@ class OctagonDomain(State):
 
     def _meet(self, other: 'Lattice'):
         print(f"in _meet, condiiton {other}")
+        # We have VARS*SIGNS + C <= 0
         var, sign, c = self.check_condition(other)
+        # Convert to Elina format -VARS*SIGNS >= C
+        sign = list(map(lambda x: -x, sign))
         self.elina.add_linear_constr(var, sign, c)
         return self
 
@@ -268,28 +346,57 @@ class OctagonDomain(State):
         copy.elina = self.elina.copy()
         return copy
 
+    def add_variable(self, variable: VariableIdentifier):
+        # add variable to elina
+        self.elina.add_dim(variable.name)
+        # add to variables list of octagon
+        self.variables.add(variable)
+        # update dictionary idx -> var name
+        self.varname_to_idx[variable.name] = len(self.variables) - 1
+
+    def forget_variable(self, variable: VariableIdentifier):
+        dim = self.varname_to_idx[variable.name]
+        element = self.elina.extract_dim(dim)
+        self.elina.project(dim)
+        return element
+
+    def remove_variable(self, variable: VariableIdentifier):
+        dim = self.varname_to_idx[variable.name]
+        self.elina.remove_dim(dim)
+        for k,v in self.varname_to_idx.items():
+            if v > dim and k != variable.name:
+                self.varname_to_idx[dim] -= 1
+
+        del self.varname_to_idx[variable.name]
+
+
 
     # ==================================================
     #             HEURISTICS
     # ==================================================
+    def generate_dict(self):
+        """
+        :return: dictionary in which every Lyra variable is mapped to an integer index to be passed to Elina
+        """
+        return {var.name: i for i, var in enumerate(self.variables)}, {i: var.name for i, var in enumerate(self.variables)}
 
     def check_expressions(self, left: Expression, right: Expression):
         """
             Checks if left and right expressions make a valid substitution.
         :param left:
         :param right:
-        :return:
+        :return:vi: variable to substitute
 
         """
         print(f"left {left}, right {right}")
         vi, vj, c, = None, None, None
         var_ids, signs, c = self.normalize_arithmetic(right)
         if isinstance(left, VariableIdentifier):
-            vi = self.dict[left.name]
+            vi = self.varname_to_idx[left.name]
             if len(var_ids) > 1:
                 raise ValueError(f"For now we only support substitution with at most one variable, {right} doesn't work")
-            vars = [self.dict[id.name] for id in var_ids]
-        return vi, vars[:1], signs[:1], c
+            vars = [self.varname_to_idx[id.name] for id in var_ids]
+        return vi, vars, signs, c
 
 
     def check_condition(self, condition: Expression):
@@ -307,7 +414,7 @@ class OctagonDomain(State):
         expr = normal_condition.left # x + y - c
         var_ids, signs, c = self.normalize_arithmetic(expr)
         # print(f"Normalized arithmetic expression {expr}")
-        vars = [self.dict[id.name] for id in var_ids]
+        vars = [self.varname_to_idx[id.name] for id in var_ids]
         return vars, signs, c
 
     def normalize_arithmetic(self, expr: Expression):

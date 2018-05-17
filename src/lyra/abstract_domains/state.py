@@ -192,9 +192,15 @@ class State(Lattice, metaclass=ABCMeta):
         self.result = set()  # assignments have no result, only side-effects
         return self
 
+    def copy(self) -> 'State':
+        """
+
+        :return: a deep copy, or an equivalent, of the current state
+        """
+        return deepcopy(self)
 
     @abstractmethod
-    def forget_variable(self, variable: VariableIdentifier):
+    def forget_variable(self, variable: VariableIdentifier) -> 'Lattice':
         """Forget all previously gathered information about a variable. """
 
     @abstractmethod

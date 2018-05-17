@@ -1,4 +1,7 @@
+from copy import deepcopy
+
 from lyra.abstract_domains.numerical.interval_domain import IntervalState
+from lyra.abstract_domains.numerical.octagon_d import OctagonDomain
 from lyra.abstract_domains.quality.type_domain import TypeState
 from lyra.abstract_domains.store import Store
 from lyra.abstract_domains.stack import Stack
@@ -17,10 +20,23 @@ class AssumptionState(State):
             "numerical": [AnyLyraType, IntegerLyraType, FloatLyraType, BooleanLyraType],
             "string": [StringLyraType]
         }
+        self.variables = variables
         self.type_state = TypeState(variables)
-        self.states["numerical"] = IntervalState([v for v in variables if type(v.typ) in self.types["numerical"]])
+        self.states["numerical"] = OctagonDomain([v for v in variables if type(v.typ) in self.types["numerical"]])
         self.states["string"] = StringAssumptionState([v for v in variables if type(v.typ) in self.types["string"]])
         self.stack = AssumptionStack(AssumptionGraph)
+
+    def copy(self):
+        new_state = AssumptionState(self.variables)
+        new_state.states = {}
+        new_state.types = deepcopy(self.types)
+        new_state.type_state = self.type_state.copy()
+        for k,v in self.states.items():
+            new_state.states[k] = v.copy()
+        new_state.stack = self.stack.copy()
+        new_state.pp = deepcopy(self.pp)
+        new_state.result = deepcopy(self.result)
+        return new_state
 
     def __repr__(self):
         return f"types: {self.type_state}, states: {self.states}, stack: {self.stack}"
@@ -38,8 +54,8 @@ class AssumptionState(State):
         return disj
 
     def is_top(self) -> bool:
-        conj, _ = self.propagate_down("is_bottom")
-        return  conj
+        conj, _ = self.propagate_down("is_top")
+        return conj
 
     # TODO add less_equal for stack
     def _less_equal(self, other: 'AssumptionState') -> bool:
@@ -97,9 +113,11 @@ class AssumptionState(State):
             self.handle_input(left, right)
         else:
             self.propagate_down("_substitute", left, right)
+
         new_type = self.type_state.get_type(left)
         old_category = self.get_key(old_type)
         new_category = self.get_key(new_type)
+        # if substitution changes type, then replace variable in appropriate domain
         if old_category != new_category and old_category != AnyLyraType:
             self.states[old_category].remove_variable(left)
             self.states[new_category].add_variable(left)
@@ -120,6 +138,13 @@ class AssumptionState(State):
     # =================================================
 
     def propagate_down(self, func: str, *args, other=None):
+        """
+        Performs a certain operation on: the type state, the stack, and the operating substates
+        :param func: name of the function to be called
+        :param args: arguments to be passed to the function
+        :param other: optional attribute in case of binary functions
+        :return:
+        """
         if other is None:
             disj = getattr(self.type_state, func)(*args) or getattr(self.stack, func)(*args)
             conj = getattr(self.type_state, func)(*args) and getattr(self.stack, func)(*args)
@@ -145,11 +170,11 @@ class AssumptionState(State):
 
     def handle_input(self, variable: VariableIdentifier, right: Expression):
         category = self.get_key(variable.typ)
-        # get non-type lattice element, this is lost after substitution
+        # get lattice element, this is lost after substitution
         lattice_element = self.states[category].forget_variable(variable)
         # perform substitution
         self.propagate_down("_substitute", variable, right)
-        # get type lattice element, this is changed only after substitution
+        # get type lattice element, this is updated only after substitution
         type_element = self.type_state.forget_variable(variable)
         # associate assumption with line number
         assumption = Assumption(id=self.pp.line, lattice_elements=[type_element, lattice_element])
@@ -231,10 +256,6 @@ class AssumptionStack(Stack):
 
     def __init__(self, typ: AssumptionGraph):
         super().__init__(typ, {})
-
-    def join(self, other: 'AssumptionStack'):
-        self_top = self.stack[-1]
-        other_top = other.stack[-1]
 
     def _assume(self, condition: Expression):
         pass

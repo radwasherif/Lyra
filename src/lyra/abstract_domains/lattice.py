@@ -195,7 +195,7 @@ class Lattice(metaclass=ABCMeta):
         self.__dict__.update(other.__dict__)
         return self
 
-    def copy(self) -> 'State':
+    def copy(self) -> 'Lattice':
         """
 
         :return: a deep copy, or an equivalent, of the current state
