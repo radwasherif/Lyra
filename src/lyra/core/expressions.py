@@ -113,9 +113,6 @@ class ExpressionVisitor(metaclass=ABCMeta):
     Adapted from `ast.py`.
     """
     def visit(self, expr, *args, **kwargs):
-        # gen = _iter_child_exprs(expr)
-        # for g in gen:
-        #     print(g)
         """Visit of an expression."""
         method = 'visit_' + expr.__class__.__name__
         if hasattr(self, method):

@@ -6,7 +6,7 @@ from lyra.abstract_domains.store import Store
 from lyra.abstract_domains.quality.assumption import AssumptionState
 from lyra.core.expressions import Expression, VariableIdentifier, LengthIdentifier
 from lyra.abstract_domains.quality.assumption_domain_m import InputAssumptionStack
-from lyra.abstract_domains.numerical.octagon_d import OctagonDomain
+from lyra.abstract_domains.numerical.octagons_domain import OctagonState
 from lyra.core.types import FloatLyraType, StringLyraType, ListLyraType, BooleanLyraType, IntegerLyraType
 
 
@@ -18,7 +18,7 @@ class NumericalAssumptionState(Store, AssumptionState):
         super().__init__(variables, lattices)
         self.variables = variables
         input_assumption_collector = InputAssumptionStack()
-        relations_collector = OctagonDomain(variables)
+        relations_collector = OctagonState(variables)
         self.collector_pairs.append((input_assumption_collector, relations_collector))
         # boolean is initialized as interval [0,1]
         for var in [v for v in variables if v.typ == BooleanLyraType()]:

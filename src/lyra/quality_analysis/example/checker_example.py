@@ -1,7 +1,11 @@
 x: int = int(input())
-if x > 2:
+if x > 3:
     raise ValueError
-y: int = int(input())
-if y > 3:
+y: float = int(input())
+if y > 2:
     raise ValueError
+if x + y > 20:
+    raise ValueError
+
+
 

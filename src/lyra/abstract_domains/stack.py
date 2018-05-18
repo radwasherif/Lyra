@@ -38,6 +38,10 @@ class Stack(BoundedLattice, metaclass=ABCMeta):
         """Current stack of lattice elements."""
         return self._stack
 
+    @stack.setter
+    def stack(self, stack):
+        self._stack = stack
+
     @property
     def lattice(self):
         """Lattice element currently on top of the stack."""
@@ -59,16 +63,7 @@ class Stack(BoundedLattice, metaclass=ABCMeta):
         """The comparison is performed point-wise for each stack element."""
         if len(self.stack) != len(other.stack):
             raise Exception("Stacks must be equally long")
-        for l, r in zip(self.stack, other.stack):
-            print(l, type(l))
-            print(r, type(r))
-
-        for l, r in zip(self.stack, other.stack):
-            if l.less_equal(other=r):
-                return True
-        return False
-
-        # return all(l.less_equal(r) for l, r in zip(self.stack, other.stack))
+        return all(l.less_equal(r) for l, r in zip(self.stack, other.stack))
 
     @copy_docstring(BoundedLattice._meet)
     def _meet(self, other: 'Stack'):

@@ -24,22 +24,22 @@ from elina.python_interface.elina_dimension import *
 import gc
 
 
-class Elina(Lattice):
+class ElinaLattice(Lattice):
 
     def __init__(self, dim: int, idx_to_varname: dict):
         self.dim = dim
         self.idx_to_varname = idx_to_varname
         self.man = opt_oct_manager_alloc()
         self.abstract = self.top()
-        self.equalize()
+        self.equate()
 
     def __repr__(self):
         return self.to_string()
 
     def copy(self):
-        copy = Elina(self.dim, self.idx_to_varname)
+        copy = ElinaLattice(self.dim, self.idx_to_varname)
         copy.abstract = elina_abstract0_copy(self.man, self.abstract)
-        copy.equalize()
+        copy.equate()
         return copy
 
     def top(self):
@@ -54,37 +54,35 @@ class Elina(Lattice):
     def is_bottom(self):
         return elina_abstract0_is_bottom(self.man, self.abstract)
 
-    def _less_equal(self, other: 'Elina'):
+    def _less_equal(self, other: 'ElinaLattice'):
         return elina_abstract0_is_leq(self.man, self.abstract, other.abstract)
 
-    def _join(self, other: 'Elina'):
+    def _join(self, other: 'ElinaLattice'):
         # self.print_constraints("self before join")
         # other.print_constraints("other before join")
         self.abstract = elina_abstract0_join(self.man, False, self.abstract, other.abstract)
-        self.equalize()
+        self.equate()
         return self
         # self.print_constraints("after join")
 
-    def _meet(self, other: 'Elina'):
+    def _meet(self, other: 'ElinaLattice'):
         self.abstract = elina_abstract0_meet(self.man, False, self.abstract, other.abstract)
-        self.equalize()
+        self.equate()
         return self
 
     def substitute(self, vi: int, vars: [int], signs: [int], c: int):
-        print(f"inside substitution {vi, vars, signs, c}")
+        # print(f"inside substitution {vi, vars, signs, c}")
         linexpr = self.create_linexpr(vars, signs, c)
         elina_linexpr0_print(linexpr, None)
         # print(vi, vj, c)
         self.abstract = elina_abstract0_substitute_linexpr(self.man, False, self.abstract, ElinaDim(vi), linexpr, None)
-        self.equalize()
+        self.equate()
         # self.print_constraints("substitute")
 
     def _widening(self, other):
         self.abstract = elina_abstract0_widening(self.man, self.abstract, other.abstract)
-        self.equalize()
-        self.print_constraints("widening")
-
-
+        self.equate()
+        # self.print_constraints("widening")
 
     def create_linexpr(self, var, sign, c):
         """
@@ -121,8 +119,8 @@ class Elina(Lattice):
         lincons_array.p[0].linexpr0 = linexpr
         top = self.top()
         self.abstract = elina_abstract0_meet_lincons_array(self.man, False, self.abstract, lincons_array)
-        self.equalize()
-        self.print_constraints("add linear constraint" + str(var) + str(sign))
+        self.equate()
+
 
     def add_dim(self, var_name: str):
         """
@@ -140,7 +138,7 @@ class Elina(Lattice):
         # update the number of dimensions of Elina
         self.dim += 1
         # equate ElinaAbstract with ElinaLinconsArray
-        self.equalize()
+        self.equate()
 
     def remove_dim(self, dim: int):
         """
@@ -159,9 +157,8 @@ class Elina(Lattice):
             if k > dim:
                 self.idx_to_varname[k-1] = self.idx_to_varname.pop(k)
         # equate ElinaAbstract with ElinaLinconsArray
-        self.equalize()
+        self.equate()
 
-    # TODO decide if this should be used
     def extract_dim(self, dim:int):
         """
             Find all constraints in which a certain variable is involved
@@ -171,11 +168,10 @@ class Elina(Lattice):
         # call closure to make sure all possible constraints are captured
         self.abstract = elina_abstract0_closure(self.man, False, self.abstract)
         # equate Elina abstract with ELina lincons_array
-        self.equalize()
+        self.equate()
         size = 0
         # allocate new lincons_array
         lincons_array = elina_lincons0_array_make(size)
-        print(lincons_array)
         new_dict = {}
         # iterate over all constraints in the lincons_array
         for i in range(self.lincons_array.size):
@@ -193,11 +189,10 @@ class Elina(Lattice):
                     size += 1
                     # create a new dictionary to be passed to the resulting elina object
                     for j in range(lincons.linexpr0.contents.size):
-                        l = lincons.linexpr0.contents.p.linterm[i]
+                        l = lincons.linexpr0.contents.p.linterm[j]
                         new_dict[l.dim] = self.idx_to_varname[l.dim]
                     break
-
-        new_elina = Elina(dim=lincons_array.size, idx_to_varname=new_dict)
+        new_elina = ElinaLattice(dim=len(new_dict), idx_to_varname=new_dict)
         new_elina.lincons_array = lincons_array
         # TODO decide whether to use intdim or realdim
         new_elina.abstract = elina_abstract0_of_lincons_array(new_elina.man, 0, size, lincons_array)
@@ -209,10 +204,15 @@ class Elina(Lattice):
         Performs the project/forget operation of the given dimension
         :param
         """
+        # print(f"removing dim{dim}")
+        self.abstract = elina_abstract0_closure(self.man, False, self.abstract)
+        self.equate()
+        self.print_constraints(f"Projecting {dim}")
         self.abstract = elina_abstract0_forget_array(self.man, False, self.abstract, ElinaDim(dim), 1)
-        self.equalize()
+        self.equate()
+        self.print_constraints(f"After projection {dim}")
 
-    def equalize(self):
+    def equate(self):
         self.lincons_array = elina_abstract0_to_lincons_array(self.man, self.abstract)
 
     def print_constraints(self, message: str):
@@ -222,114 +222,97 @@ class Elina(Lattice):
 
     def to_string (self):
         lincons_array = self.lincons_array
-        string = ""
-        # print("In OCT REPR")
-        # elina_lincons0_array_print(lincons_array, None)
         if self.is_top():
-            return "TOP"
+            return "T"
         if self.is_bottom():
-            return "BOTTOM"
-        counter = 0
+            return "⊥"
+        result = []
         for j in range(lincons_array.size):
+            string = ""
             lincons = lincons_array.p[j]
             for i in range(lincons.linexpr0.contents.size):
-                # print("inner " + str(i))
                 linterm = lincons.linexpr0.contents.p.linterm[i]
                 coeff = linterm.coeff
-                # print(f"COEFF = {coeff.val.scalar.contents.val}, {elina_coeff_equal_int(coeff, 1)}")
                 string += (" + " if elina_coeff_equal_int(coeff, 1) else " - ")
                 string += (self.idx_to_varname[linterm.dim])
-
-                # print(string)
             if lincons.constyp == ElinaConstyp.ELINA_CONS_SUPEQ:
                 string += " >= "
-                print(string)
             elif lincons.constyp == ElinaConstyp.ELINA_CONS_SUP:
                 string += " > "
-                # print(string)
             elif lincons.constyp == ElinaConstyp.ELINA_CONS_EQ:
                 string += " = "
-                # print(string)
             string += str(lincons.linexpr0.contents.cst.val.scalar.contents.val.dbl)
-            string += "\n"
-        # print(string)
-        # print(type(string))
-        return string
-
-
+            result.append(string)
+        return f"OCT({','.join(result)})"
 
     def dim_to_pp(self, dim, pp):
         self.idx_to_varname[dim] = pp
 
 
-class OctagonDomain(State):
+class OctagonState(State):
     def __init__(self, variables: List[VariableIdentifier]):
         self.variables = set(variables)
         self.varname_to_idx, idx_to_varname = self.generate_dict()
-        self.elina = Elina(dim=len(variables), idx_to_varname=idx_to_varname)
+        self.elina = ElinaLattice(dim=len(variables), idx_to_varname=idx_to_varname)
 
     def __repr__(self):
         return self.elina.to_string()
 
     def _assign(self, left: Expression, right: Expression) -> 'State':
-        print("ASSIGN")
-        return self
+       raise Exception("Assign should not be called in backward analysis.")
 
-    def _assume(self, condition: Expression) -> 'State': #MEET
+    def _assume(self, condition: Expression) -> 'State':
         return self._meet(condition)
 
-
-    def enter_if(self) -> 'State':
+    def enter_if(self) -> 'OctagonState':
         return self
 
-    def exit_if(self) -> 'State':
+    def exit_if(self) -> 'OctagonState':
         return self
 
-    def enter_loop(self) -> 'State':
+    def enter_loop(self) -> 'OctagonState':
         return self
 
-    def exit_loop(self) -> 'State':
+    def exit_loop(self) -> 'OctagonState':
         return self
 
-    def _output(self, output: Expression) -> 'State':
+    def _output(self, output: Expression) -> 'OctagonState':
         return self
 
-    def raise_error(self) -> 'State':
+    def raise_error(self) -> 'OctagonState':
         return self.bottom()
 
-    def _substitute(self, left: Expression, right: Expression) -> 'State':
-        self.elina.print_constraints("before substitute")
+    def _substitute(self, left: Expression, right: Expression) -> 'OctagonState':
         if(isinstance(right, Input)):
             return self
         vi, vars, signs, c = self.check_expressions(left, right)
         self.elina.substitute(vi, vars, signs, c)
-        self.elina.print_constraints("after substitute")
         return self
 
     def bottom(self):
         self.elina.abstract = self.elina.bottom()
-        self.elina.equalize()
+        self.elina.equate()
         return self
 
     def top(self):
         self.elina.abstract = self.elina.top()
-        self.elina.equalize()
+        self.elina.equate()
         return self
+
     def is_bottom(self) -> bool:
         return self.elina.is_bottom()
 
     def is_top(self) -> bool:
         return self.elina.is_top()
 
-    def _less_equal(self, other: 'Lattice') -> bool:
+    def _less_equal(self, other: 'OctagonState') -> bool:
         return self.elina.less_equal(other.elina)
 
-    def _join(self, other: 'Lattice') -> 'Lattice':
+    def _join(self, other: 'OctagonState') -> 'OctagonState':
         self.elina.join(other.elina)
         return self
 
-    def _meet(self, other: 'Lattice'):
-        print(f"in _meet, condiiton {other}")
+    def _meet(self, other: 'OctagonState'):
         # We have VARS*SIGNS + C <= 0
         var, sign, c = self.check_condition(other)
         # Convert to Elina format -VARS*SIGNS >= C
@@ -337,12 +320,12 @@ class OctagonDomain(State):
         self.elina.add_linear_constr(var, sign, c)
         return self
 
-    def _widening(self, other: 'Lattice'):
+    def _widening(self, other: 'OctagonState'):
         self.elina.widening(other.elina)
         return self
 
     def copy(self):
-        copy = OctagonDomain(self.variables)
+        copy = OctagonState(self.variables)
         copy.elina = self.elina.copy()
         return copy
 
@@ -351,7 +334,7 @@ class OctagonDomain(State):
         self.elina.add_dim(variable.name)
         # add to variables list of octagon
         self.variables.add(variable)
-        # update dictionary idx -> var name
+        # update dictionary {idx -> varname}
         self.varname_to_idx[variable.name] = len(self.variables) - 1
 
     def forget_variable(self, variable: VariableIdentifier):
@@ -366,10 +349,7 @@ class OctagonDomain(State):
         for k,v in self.varname_to_idx.items():
             if v > dim and k != variable.name:
                 self.varname_to_idx[dim] -= 1
-
         del self.varname_to_idx[variable.name]
-
-
 
     # ==================================================
     #             HEURISTICS
@@ -388,7 +368,7 @@ class OctagonDomain(State):
         :return:vi: variable to substitute
 
         """
-        print(f"left {left}, right {right}")
+        # print(f"left {left}, right {right}")
         vi, vj, c, = None, None, None
         var_ids, signs, c = self.normalize_arithmetic(right)
         if isinstance(left, VariableIdentifier):
@@ -408,8 +388,6 @@ class OctagonDomain(State):
         # print(f"Checking condition {condition}")
         negation_free_normal = NegationFreeNormalExpression()
         normal_condition = negation_free_normal.visit(condition)
-        print(f"Normalized condition {normal_condition}")
-        # print(Expression._walk(normal_condition))
         vars, signs = [], []
         expr = normal_condition.left # x + y - c
         var_ids, signs, c = self.normalize_arithmetic(expr)
@@ -420,8 +398,8 @@ class OctagonDomain(State):
     def normalize_arithmetic(self, expr: Expression):
         """
 
-        :param expr: Linear expression with 1 coefficients and any number of constant terms
-        :return: new expression of the form ((+/-v1) + (+/-v2) + (+/-v3) + ... ) + C, where C = sum of all constants in         expr
+        :param expr: Linear expression with coefficients of -1 or 1 and any number of constant terms
+        :return: new expression of the form ((+/-v1) + (+/-v2) + (+/-v3) + ... ) + C, where C = sum of all constants in expr
         """
         vars, signs = self.flatten_expr(expr, 1)
         constant = 0
@@ -436,9 +414,9 @@ class OctagonDomain(State):
         for i in sorted(idx_to_del, reverse=True):
             del vars[i]
             del signs[i]
-
-        if len(vars) > 2:
-            raise ValueError("Expression should have only 2 variables")
+        #
+        # if len(vars) > 2:
+        #     raise ValueError("Expression should have only 2 variables")
         return vars, signs, constant
 
     def flatten_expr(self, expr: Expression, sign: int):

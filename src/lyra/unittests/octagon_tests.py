@@ -13,7 +13,7 @@ import unittest
 from lyra.engine.backward import BackwardInterpreter
 from lyra.semantics.backward import DefaultBackwardSemantics
 
-from lyra.abstract_domains.numerical.octagon_d import OctagonDomain
+from lyra.abstract_domains.numerical.octagons_domain import OctagonState
 from lyra.unittests.runner import TestRunner
 
 
@@ -23,7 +23,7 @@ class OctagonTest(TestRunner):
         return BackwardInterpreter(self.cfg, DefaultBackwardSemantics(), 3)
 
     def state(self):
-        return OctagonDomain(self.variables)
+        return OctagonState(self.variables)
 
 
 def test_suite():

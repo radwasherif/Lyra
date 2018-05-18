@@ -79,7 +79,6 @@ class TypeLattice(Lattice):
 
     def top(self):
         self.replace(TypeLattice(self.types[-1]))
-        print(self.type_element)
         return self
 
     def is_bottom(self) -> bool:

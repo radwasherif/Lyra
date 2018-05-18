@@ -1,7 +1,7 @@
 from copy import deepcopy
 
 from lyra.abstract_domains.numerical.interval_domain import IntervalState
-from lyra.abstract_domains.numerical.octagon_d import OctagonDomain
+from lyra.abstract_domains.numerical.octagons_domain import OctagonState
 from lyra.abstract_domains.quality.type_domain import TypeState
 from lyra.abstract_domains.store import Store
 from lyra.abstract_domains.stack import Stack
@@ -22,9 +22,10 @@ class AssumptionState(State):
         }
         self.variables = variables
         self.type_state = TypeState(variables)
-        self.states["numerical"] = OctagonDomain([v for v in variables if type(v.typ) in self.types["numerical"]])
+        self.states["numerical"] = OctagonState([v for v in variables if type(v.typ) in self.types["numerical"]])
         self.states["string"] = StringAssumptionState([v for v in variables if type(v.typ) in self.types["string"]])
         self.stack = AssumptionStack(AssumptionGraph)
+        self.pp = 0
 
     def copy(self):
         new_state = AssumptionState(self.variables)
@@ -35,7 +36,8 @@ class AssumptionState(State):
             new_state.states[k] = v.copy()
         new_state.stack = self.stack.copy()
         new_state.pp = deepcopy(self.pp)
-        new_state.result = deepcopy(self.result)
+        if self.stack != new_state.stack:
+            print("NOT EQUAL", self.stack, new_state.stack)
         return new_state
 
     def __repr__(self):
@@ -183,6 +185,56 @@ class AssumptionState(State):
         # TODO replace every occurence of variable in stack with its line number
 
 
+class AssumptionStack(Stack):
+
+    def __init__(self, typ: AssumptionGraph):
+        super().__init__(typ, {})
+
+    def _assume(self, condition: Expression):
+        pass
+
+    def _substitute(self, left: Expression, right: Expression):
+        pass
+
+    def raise_error(self):
+        pass
+
+    def push(self):
+        self.stack.append(AssumptionGraph())
+        return self
+
+    def copy(self):
+        new_stack = AssumptionStack(AssumptionGraph)
+        array = []
+        for element in self.stack:
+            array.append(element.copy())
+        new_stack.stack = array
+        return new_stack
+
+    def pop(self):
+        upper = self.stack.pop(-1)
+        lower = None
+        if len(self.stack) > 0:
+            lower = self.stack.pop(-1)
+
+        # combine the two top elements to make one element
+        new_top = upper.combine(lower)
+        # push new element to top of stack
+        self.stack.append(new_top)
+        return self
+
+    def replace(self, variable: VariableIdentifier, pp: ProgramPoint):
+        pass
+
+    def top_layer(self, is_loop: bool=None, condition: Expression=None, prepend:Assumption=None):
+        if is_loop is not None:
+            self.stack[-1].is_loop = is_loop
+        if condition is not None:
+            self.stack[-1].condition = condition
+        if prepend is not None:
+            self.stack[-1].add_assumption(prepend)
+
+
 class StringAssumptionState(State):
 
     def __init__(self, variables: List[VariableIdentifier]):
@@ -250,44 +302,3 @@ class StringAssumptionState(State):
 
     def remove_variable(self, variable: VariableIdentifier):
         pass
-
-
-class AssumptionStack(Stack):
-
-    def __init__(self, typ: AssumptionGraph):
-        super().__init__(typ, {})
-
-    def _assume(self, condition: Expression):
-        pass
-
-    def _substitute(self, left: Expression, right: Expression):
-        pass
-
-    def raise_error(self):
-        pass
-
-    def push(self):
-        self.stack.append(AssumptionGraph())
-        return self
-
-    def pop(self):
-        upper = self.stack.pop(-1)
-        lower = None
-        if len(self.stack) > 0:
-            lower = self.stack.pop(-1)
-        # combine the two top elements to make one element
-        new_top = upper.combine(lower)
-        # push new element to top of stack
-        self.stack.append(new_top)
-        return self
-
-    def replace(self, variable: VariableIdentifier, pp: ProgramPoint):
-        pass
-
-    def top_layer(self, is_loop: bool=None, condition: Expression=None, prepend:Assumption=None):
-        if is_loop is not None:
-            self.stack[-1].is_loop = is_loop
-        if condition is not None:
-            self.stack[-1].condition = condition
-        if prepend is not None:
-            self.stack[-1].add_assumption(prepend)
