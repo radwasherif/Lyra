@@ -1,4 +1,3 @@
-
 f = open('input.txt', 'r')
 first_line = f.readline()
 lines = f.readlines()

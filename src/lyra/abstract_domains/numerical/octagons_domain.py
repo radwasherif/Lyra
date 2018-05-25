@@ -23,6 +23,8 @@ from elina.python_interface.elina_dimension import *
 
 import gc
 
+from lyra.core.statements import ProgramPoint
+
 
 class ElinaLattice(Lattice):
 
@@ -83,6 +85,15 @@ class ElinaLattice(Lattice):
         self.abstract = elina_abstract0_widening(self.man, self.abstract, other.abstract)
         self.equate()
         # self.print_constraints("widening")
+
+    def replace_variable(self, variable: Identifier, pp: ProgramPoint):
+        for idx, varname in self.idx_to_varname.items():
+            if varname == variable.name:
+                self.idx_to_varname[idx] = f"id{pp.line}"
+
+    # ==================================================
+    #             HEURISTICS
+    # ==================================================
 
     def create_linexpr(self, var, sign, c):
         """
@@ -148,7 +159,7 @@ class ElinaLattice(Lattice):
         """
         # create dimchange array with the variable to be removed
         dimchange = elina_dimchange_alloc(0, 1)
-        dimchange.dim[0] = dim
+        dimchange.contents.dim[0] = dim
         # remove variable from Elina
         self.abstract = elina_abstract0_remove_dimensions(self.man, False, self.abstract, dimchange)
         # update dictionary (Elina index -> variable name) accordingly
@@ -194,8 +205,15 @@ class ElinaLattice(Lattice):
                     break
         new_elina = ElinaLattice(dim=len(new_dict), idx_to_varname=new_dict)
         new_elina.lincons_array = lincons_array
-        # TODO decide whether to use intdim or realdim
-        new_elina.abstract = elina_abstract0_of_lincons_array(new_elina.man, 0, size, lincons_array)
+        new_elina.abstract = elina_abstract0_of_lincons_array(new_elina.man, size, 0, lincons_array)
+        # if self.idx_to_varname[dim] == 'x':
+        #     print("SIZE", size)
+        #     self.print_constraints(f"original{dim}")
+        #     print("after extraction")
+        #     elina_lincons0_array_print(lincons_array, None)
+        #     new_elina.print_constraints("NEW ELINA")
+        #     print(elina_abstract0_is_top(new_elina.man, new_elina.abstract))
+        #     print(new_elina.is_top())
         return new_elina
 
 
@@ -204,13 +222,8 @@ class ElinaLattice(Lattice):
         Performs the project/forget operation of the given dimension
         :param
         """
-        # print(f"removing dim{dim}")
-        self.abstract = elina_abstract0_closure(self.man, False, self.abstract)
+        self.abstract = elina_abstract0_forget_array(self.man, False, self.abstract, ElinaDim(dim), 1, False)
         self.equate()
-        self.print_constraints(f"Projecting {dim}")
-        self.abstract = elina_abstract0_forget_array(self.man, False, self.abstract, ElinaDim(dim), 1)
-        self.equate()
-        self.print_constraints(f"After projection {dim}")
 
     def equate(self):
         self.lincons_array = elina_abstract0_to_lincons_array(self.man, self.abstract)
@@ -250,8 +263,10 @@ class ElinaLattice(Lattice):
 
 
 class OctagonState(State):
+
+
     def __init__(self, variables: List[VariableIdentifier]):
-        self.variables = set(variables)
+        self.variables = list(set(variables))
         self.varname_to_idx, idx_to_varname = self.generate_dict()
         self.elina = ElinaLattice(dim=len(variables), idx_to_varname=idx_to_varname)
 
@@ -262,6 +277,8 @@ class OctagonState(State):
        raise Exception("Assign should not be called in backward analysis.")
 
     def _assume(self, condition: Expression) -> 'State':
+        if not self.belong_here(condition.ids()):
+            return self
         return self._meet(condition)
 
     def enter_if(self) -> 'OctagonState':
@@ -283,6 +300,8 @@ class OctagonState(State):
         return self.bottom()
 
     def _substitute(self, left: Expression, right: Expression) -> 'OctagonState':
+        if not self.belong_here(left.ids().union(right.ids())):
+            return self
         if(isinstance(right, Input)):
             return self
         vi, vars, signs, c = self.check_expressions(left, right)
@@ -351,6 +370,11 @@ class OctagonState(State):
                 self.varname_to_idx[dim] -= 1
         del self.varname_to_idx[variable.name]
 
+    def replace_variable(self, variable: Identifier, pp: ProgramPoint):
+        pass
+
+    def belong_here(self, vars):
+        return all(var in self.variables for var in vars)
     # ==================================================
     #             HEURISTICS
     # ==================================================
@@ -385,13 +409,12 @@ class OctagonState(State):
         :param condition: condition to be checked
         :return:
         '''
-        # print(f"Checking condition {condition}")
+        print(f"Checking condition {condition}")
         negation_free_normal = NegationFreeNormalExpression()
         normal_condition = negation_free_normal.visit(condition)
         vars, signs = [], []
         expr = normal_condition.left # x + y - c
         var_ids, signs, c = self.normalize_arithmetic(expr)
-        # print(f"Normalized arithmetic expression {expr}")
         vars = [self.varname_to_idx[id.name] for id in var_ids]
         return vars, signs, c
 

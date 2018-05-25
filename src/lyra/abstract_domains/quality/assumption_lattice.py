@@ -5,15 +5,15 @@ from typing import List
 from lyra.abstract_domains.lattice import Lattice
 from lyra.abstract_domains.state import State
 from lyra.abstract_domains.numerical.interval_domain import IntervalState, IntervalLattice
+from lyra.core.statements import ProgramPoint
 from lyra.core.types import LyraType, IntegerLyraType
 
 from abc import ABCMeta, abstractmethod
 
-from lyra.core.expressions import Expression, Literal, VariableIdentifier
+from lyra.core.expressions import Expression, Literal, VariableIdentifier, Identifier
 
 
 class TypeLattice(State):
-
     class Type(IntEnum):
         """
             Type enum.
@@ -107,6 +107,9 @@ class TypeLattice(State):
     def remove_variable(self, variable: VariableIdentifier):
         pass
 
+    def replace_variable(self, variable: Identifier, pp: ProgramPoint):
+        pass
+
 
 class Assumption(Lattice):
 
@@ -141,7 +144,8 @@ class Assumption(Lattice):
         return all(element.is_top() for element in self.lattice_elements)
 
     def _less_equal(self, other: 'Assumption') -> bool:
-        return all(element.less_equal(other_element) if type(element) is type(other_element) else False for element, other_element in zip(self.lattice_elements, other.lattice_elements))
+        return all(element.less_equal(other_element) if type(element) is type(other_element) else False for
+                   element, other_element in zip(self.lattice_elements, other.lattice_elements))
 
     def _join(self, other: 'Assumption') -> 'Assumption':
         for element, other_element in zip(self.lattice_elements, other.lattice_elements):
@@ -168,6 +172,10 @@ class Assumption(Lattice):
         for element in self.lattice_elements:
             array.append(element.copy())
         return Assumption(self.id, array)
+
+    def replace_variable(self, variable: Identifier, pp: ProgramPoint):
+        for element in self.lattice_elements:
+            element.replace_variable(variable, pp)
 
 
 class AssumptionGraph(Lattice):
@@ -234,10 +242,12 @@ class AssumptionGraph(Lattice):
         except Exception:
             return self.top()
 
-
     def _widening(self, other: 'Lattice'):
         self.join(other)
         return self
+
+    def replace_variable(self, variable: Identifier, pp: ProgramPoint):
+        self.traverse(self, "replace_variable", variable, pp)
 
     # =============================================
     #             HEURISTICS
@@ -272,7 +282,7 @@ class AssumptionGraph(Lattice):
                 return getattr(graph, func)(*args)
             conj, disj = True, False
             for assmp in graph.assumptions:
-                result = self.traverse(assmp, func)
+                result = self.traverse(assmp, func, *args)
                 if isinstance(result, bool):
                     conj = conj and result
                     disj = disj or result
@@ -314,5 +324,3 @@ class AssumptionGraph(Lattice):
         :return:
         """
         self.assumptions = [assumption] + self.assumptions
-
-

@@ -1,7 +1,7 @@
 /*
  *
  *  This source file is part of ELINA (ETH LIbrary for Numerical Analysis).
- *  ELINA is Copyright © 2017 Department of Computer Science, ETH Zurich
+ *  ELINA is Copyright © 2018 Department of Computer Science, ETH Zurich
  *  This software is distributed under GNU Lesser General Public License Version 3.0.
  *  For more information, see the ELINA project website at:
  *  http://elina.ethz.ch
@@ -62,6 +62,11 @@ elina_interval_t* elina_eval_texpr0(elina_manager_t* man,
 			      elina_texpr0_t* expr,
 			      elina_scalar_discr_t discr,
 			      bool* pexact);
+
+void elina_interval_eval_elina_texpr0(elina_interval_t *res,
+				elina_texpr0_t* expr,elina_scalar_discr_t discr,
+				elina_interval_t** env);
+
 
 /* ********************************************************************** */
 /* II. Interval linearization of linear tree expressions */

@@ -1,19 +1,35 @@
+#
+#
+#  This source file is part of ELINA (ETH LIbrary for Numerical Analysis).
+#  ELINA is Copyright © 2018 Department of Computer Science, ETH Zurich
+#  This software is distributed under GNU Lesser General Public License Version 3.0.
+#  For more information, see the ELINA project website at:
+#  http://elina.ethz.ch
+#
+#  THE SOFTWARE IS PROVIDED "AS-IS" WITHOUT ANY WARRANTY OF ANY KIND, EITHER
+#  EXPRESS, IMPLIED OR STATUTORY, INCLUDING BUT NOT LIMITED TO ANY WARRANTY
+#  THAT THE SOFTWARE WILL CONFORM TO SPECIFICATIONS OR BE ERROR-FREE AND ANY
+#  IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE,
+#  TITLE, OR NON-INFRINGEMENT.  IN NO EVENT SHALL ETH ZURICH BE LIABLE FOR ANY     
+#  DAMAGES, INCLUDING BUT NOT LIMITED TO DIRECT, INDIRECT,
+#  SPECIAL OR CONSEQUENTIAL DAMAGES, ARISING OUT OF, RESULTING FROM, OR IN
+#  ANY WAY CONNECTED WITH THIS SOFTWARE (WHETHER OR NOT BASED UPON WARRANTY,
+#  CONTRACT, TORT OR OTHERWISE).
+#
+#
+
+
+
 import sys
-sys.path.insert(0, '../../../')
+sys.path.insert(0, '../')
 
-from elina.python_interface.elina_auxiliary_imports import *
-from elina.python_interface.opt_oct import *
-from elina.python_interface.test_imports import *
-from elina.python_interface.elina_scalar import *
-from elina.python_interface.elina_lincons0 import *
-from elina.python_interface.elina_lincons0_h import *
-from elina.python_interface.elina_manager import *
-from elina.python_interface.elina_abstract0 import *
-from elina.python_interface.elina_linexpr0 import *
-from elina.python_interface.elina_linexpr0_h import *
-from elina.python_interface.elina_dimension_h import *
-import  random
-
+from elina_auxiliary_imports import *
+from opt_oct import *
+from test_imports import *
+from elina_scalar import *
+from elina_lincons0 import *
+from elina_manager import *
+from elina_abstract0 import *
 import gc
 
 def generate_random_linexpr0(dim,nbcons,is_lincons):
@@ -23,7 +39,7 @@ def generate_random_linexpr0(dim,nbcons,is_lincons):
                 size = random.randint(1,2)        
         linexpr0 = elina_linexpr0_alloc(ElinaLinexprDiscr.ELINA_LINEXPR_SPARSE, size)
         d = random.randint(0, 10)
-        cst = pointer(linexpr0.contents.cst) #the constant of the expression
+        cst = pointer(linexpr0.contents.cst)
         elina_scalar_set_int(cst.contents.val.scalar, d)
         if(size):
         	v1 = random.randint(0, dim-1)
@@ -49,27 +65,6 @@ def generate_random_linexpr0(dim,nbcons,is_lincons):
             		elina_scalar_set_double(coeff.contents.val.scalar, -1)
         return linexpr0
 
-def generate_linexpr0(size, var, sign, c):
-	if size > 2: 
-		print ("Size shouldn't be greater than 2")
-		return None 
-	linexpr0 = elina_linexpr0_alloc(ElinaLinexprDiscr.ELINA_LINEXPR_SPARSE, size)
-	cst = pointer(linexpr0.contents.cst)
-	#set the constant of the expression to c 
-	elina_scalar_set_int(cst.contents.val.scalar, c)
-	#let the variables and coefficients (signs) of the linear expression
-	for i in range(size):
-		linterm = pointer(linexpr0.contents.p.linterm[i])
-		linterm.contents.dim = ElinaDim(var[i])
-		coeff = pointer(linterm.contents.coeff)
-		elina_scalar_set_double(coeff.contents.val.scalar, sign[i])
-
-	return linexpr0
-
-
-
-
-
 def generate_random_lincons0_array(dim, nbcons):
 
     lincons0_array = elina_lincons0_array_make(nbcons)
@@ -87,13 +82,13 @@ def generate_random_lincons0_array(dim, nbcons):
 
 
 def test_meet_lincons(man,dim,nbcons):
-	arr = generate_random_lincons0_array(dim,nbcons) #generate random array of linear constraints
-	top = elina_abstract0_top(man,dim,0) #create top element
+	arr = generate_random_lincons0_array(dim,nbcons)
+	top = elina_abstract0_top(man,dim,0)
 	print("Meet lincons input constraints")
-	elina_lincons0_array_print(arr,None) #prints array of linear constraints
-	sys.stdout.flush() 
-	o1 = elina_abstract0_meet_lincons_array(man,False,top,arr) #o1 = top (intersects) arr
-	arr2 = elina_abstract0_to_lincons_array(man,o1) #arr2 = concrete()
+	elina_lincons0_array_print(arr,None)
+	sys.stdout.flush()
+	o1 = elina_abstract0_meet_lincons_array(man,False,top,arr)
+	arr2 = elina_abstract0_to_lincons_array(man,o1)
 	print("OutPut Octagon")
 	elina_lincons0_array_print(arr2,None)
 	elina_lincons0_array_clear(arr)
@@ -103,16 +98,16 @@ def test_meet_lincons(man,dim,nbcons):
 
 def test_assign(man,dim,nbcons):
 	arr = generate_random_lincons0_array(dim,nbcons)
-	o1 = elina_abstract0_top(man,dim,0) 
-	o1 = elina_abstract0_meet_lincons_array(man,True,o1,arr) 
+	o1 = elina_abstract0_top(man,dim,0)
+	o1 = elina_abstract0_meet_lincons_array(man,True,o1,arr)
 	print("Assign input octagon")
 	arr2 = elina_abstract0_to_lincons_array(man,o1)
 	elina_lincons0_array_print(arr2,None)
 	elina_lincons0_array_clear(arr)
 	elina_lincons0_array_clear(arr2)
-	var = random.randint(0,dim-1) #int representing a variable I suppose
-	tdim= ElinaDim(var) #casting to c_uint
-	linexpr0 = generate_random_linexpr0(dim,nbcons,True) 
+	var = random.randint(0,dim-1)
+	tdim= ElinaDim(var)
+	linexpr0 = generate_random_linexpr0(dim,nbcons,True)
 	print("Statement x",int(var))
 	elina_linexpr0_print(linexpr0,None)
 	sys.stdout.flush()
@@ -124,6 +119,36 @@ def test_assign(man,dim,nbcons):
 	elina_linexpr0_free(linexpr0)
 	elina_abstract0_free(man,o1)
 	elina_abstract0_free(man,o2)
+
+
+def test_forget(man,dim,nbcons):
+	arr = generate_random_lincons0_array(dim,nbcons)
+	o1 = elina_abstract0_top(man,dim,0)
+	o1 = elina_abstract0_meet_lincons_array(man,True,o1,arr)
+	print("Forget input octagon")
+	arr2 = elina_abstract0_to_lincons_array(man,o1)
+	elina_lincons0_array_print(arr2,None)
+	elina_lincons0_array_clear(arr)
+	elina_lincons0_array_clear(arr2)
+	var = random.randint(0,dim-1)
+	tdim= ElinaDim(var)
+	print("Variable x",int(var))
+	sys.stdout.flush()
+	o2 = elina_abstract0_forget_array(man,False,o1,tdim,1,False)
+	arr3 = elina_abstract0_to_lincons_array(man,o2)
+	print("Forget output Octagon without project")
+	elina_lincons0_array_print(arr3,None)
+	elina_lincons0_array_clear(arr3)
+
+	o3 = elina_abstract0_forget_array(man,False,o1,tdim,1,True)
+	arr4 = elina_abstract0_to_lincons_array(man,o3)
+	print("Forget output Octagon with project")
+	elina_lincons0_array_print(arr4,None)
+	elina_lincons0_array_clear(arr4)
+
+	elina_abstract0_free(man,o1)
+	elina_abstract0_free(man,o2)
+	elina_abstract0_free(man,o3)
 
 def test_substitute(man,dim,nbcons):
 	arr = generate_random_lincons0_array(dim,nbcons)
@@ -179,13 +204,11 @@ def test_join(man,dim,nbcons):
 dim = int(sys.argv[1])
 nbcons = int(sys.argv[2])
 man = opt_oct_manager_alloc()
-# test_meet_lincons(man,dim,nbcons)
-# test_assign(man,dim,nbcons)
-# test_substitute(man,dim,nbcons)
-# test_join(man,dim,nbcons)
-linexpr = generate_linexpr0(2, [0, 1], [1, -1], 4)
-elina_linexpr0_print(linexpr, None)
-print()
+test_meet_lincons(man,dim,nbcons)
+test_assign(man,dim,nbcons)
+test_substitute(man,dim,nbcons)
+test_join(man,dim,nbcons)
+test_forget(man,dim,nbcons)
 elina_manager_free(man)
 gc.collect()
 

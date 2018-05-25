@@ -13,6 +13,8 @@ from functools import reduce
 from typing import List
 from copy import deepcopy
 
+from lyra.core.expressions import Identifier
+from lyra.core.statements import ProgramPoint
 from lyra.core.utils import copy_docstring
 
 
@@ -201,6 +203,10 @@ class Lattice(metaclass=ABCMeta):
         :return: a deep copy, or an equivalent, of the current state
         """
         return deepcopy(self)
+
+    @abstractmethod
+    def replace_variable(self, variable: Identifier, pp: ProgramPoint):
+        """Replaces variable with the line number from which it is read as input."""
 
 
 class KindMixin(Lattice, metaclass=ABCMeta):

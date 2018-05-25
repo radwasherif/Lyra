@@ -1,7 +1,7 @@
 /*
  *
  *  This source file is part of ELINA (ETH LIbrary for Numerical Analysis).
- *  ELINA is Copyright © 2017 Department of Computer Science, ETH Zurich
+ *  ELINA is Copyright © 2018 Department of Computer Science, ETH Zurich
  *  This software is distributed under GNU Lesser General Public License Version 3.0.
  *  For more information, see the ELINA project website at:
  *  http://elina.ethz.ch
@@ -192,8 +192,8 @@ opt_oct_t* opt_oct_meet_lincons_array(elina_manager_t* man,
 			      bool destructive, opt_oct_t* o,
 			      elina_lincons0_array_t* array)
 {
-	  printf(".");
-	  fflush(stdout);
+  //printf(".");
+  //fflush(stdout);
   //printf("meet lincons INPUT\n");
   //elina_lincons0_array_t arr1 = opt_oct_to_lincons_array(man,o);
   //elina_lincons0_array_fprint(stdout,&arr1,NULL);

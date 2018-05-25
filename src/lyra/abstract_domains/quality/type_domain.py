@@ -4,23 +4,42 @@ from typing import List
 from lyra.abstract_domains.lattice import Lattice
 from lyra.abstract_domains.state import State
 from lyra.abstract_domains.store import Store
-from lyra.core.expressions import Expression, VariableIdentifier
+from lyra.core.expressions import Expression, VariableIdentifier, Identifier
+from lyra.core.statements import ProgramPoint
 from lyra.core.types import *
+
+
+class TopLyraType(LyraType):
+
+    def __repr__(self):
+        return "T"
+
+
+class BottomLyraType(LyraType):
+    def __repr__(self):
+        return "⊥"
 
 
 class TypeState(Store, State):
 
     def __init__(self, variables: List[VariableIdentifier]):
-        types = [BooleanLyraType, IntegerLyraType, FloatLyraType, StringLyraType, ListLyraType]
+        types = [BooleanLyraType, IntegerLyraType, FloatLyraType, StringLyraType]
         lattices = {typ: TypeLattice for typ in types}
-        super().__init__(variables, lattices)
+        arguments = {}
+        for typ in types:
+            t = typ()
+            arguments[typ] = {"type_element": t}
+        super().__init__(variables, lattices, arguments)
 
     def _assign(self, left: Expression, right: Expression) -> 'TypeState':
         pass
 
-    #TODO implement assume for type_element
+    # TODO implement assume for type_element
     def _assume(self, condition: Expression) -> 'TypeState':
-        pass
+        # ids = condition.ids()
+        # for variable in ids:
+        #     self.store[variable] = self.store[variable].meet(TypeLattice(type_element=condition.typ))
+        return self
 
     def enter_if(self) -> 'TypeState':
         pass
@@ -42,7 +61,7 @@ class TypeState(Store, State):
         return self
 
     def _substitute(self, left: Expression, right: Expression) -> 'TypeState':
-        self.store[left].substitute(right.typ)
+        self.store[left].join(TypeLattice(type_element=right.typ))
         return self
 
     def get_type(self, variable: VariableIdentifier) -> 'Type':
@@ -59,12 +78,15 @@ class TypeState(Store, State):
         self.store[variable].top()
         return val
 
+    def replace_variable(self, variable: Identifier, pp: ProgramPoint):
+        pass
+
 
 class TypeLattice(Lattice):
 
     def __init__(self, type_element=None):
         super().__init__()
-        self.types = [BooleanLyraType, IntegerLyraType, FloatLyraType, StringLyraType, AnyLyraType]
+        self.types = [BottomLyraType(), BooleanLyraType(), IntegerLyraType(), FloatLyraType(), StringLyraType(), TopLyraType()]
         if type_element is not None:
             self.type_element = type_element
         else:
@@ -97,18 +119,16 @@ class TypeLattice(Lattice):
         return self
 
     def _meet(self, other: 'TypeLattice') -> 'TypeLattice':
-        idx1 = self.types.index(self.type_element)
-        idx2 = self.types.index(self.type_element)
+        idx1 = self.types.index(type(self.type_element))
+        idx2 = self.types.index(type(self.type_element))
         self.replace(TypeLattice(self.types[min(idx1, idx2)]))
         return self
 
     def _widening(self, other: 'TypeLattice') -> 'TypeLattice':
         return self._join(other)
 
-    def substitute(self, type_element):
-        self.type_element = type_element
-        return self
+    def replace_variable(self, variable: Identifier, pp: ProgramPoint):
+        pass
 
     def get_type(self, variable: VariableIdentifier):
         return self.type_element
-

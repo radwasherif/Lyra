@@ -14,6 +14,7 @@ else:
     else:
         b:int = 20
     a:int = 20
+
     if a > 0:
         pass
     else:
