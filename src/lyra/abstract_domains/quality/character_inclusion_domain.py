@@ -59,7 +59,6 @@ class CharacterInclusionState(Store, State):
         expr = BinaryComparisonOperation(StringLyraType, left, BinaryComparisonOperation.Operator.Eq, right)
         map = evaluation.visit(expr)
         self.store[left] = map[left]
-        print(left, right)
         self.check_for_none()
         return self
 
@@ -165,7 +164,6 @@ class CharacterInclusionLattice(Lattice):
 
     def replace_variable(self, variable: Identifier, pp: ProgramPoint):
         replacer = VariableReplacer()
-        print("REPLACING", variable)
         self.certainly = replacer.visit(self.certainly, pp=pp, variable=variable)
         self.maybe = replacer.visit(self.maybe, pp=pp, variable=variable)
         pass

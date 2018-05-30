@@ -1,1 +1,0 @@
-The input data did not violate any assumptions found by the analyzer.

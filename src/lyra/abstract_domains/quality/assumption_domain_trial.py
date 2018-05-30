@@ -2,7 +2,7 @@ from lyra.abstract_domains.store import Store
 from lyra.abstract_domains.stack import Stack
 from lyra.abstract_domains.state import State
 from lyra.core.expressions import *
-from lyra.abstract_domains.quality.assumption_lattice import AssumptionGraph, Assumption, NumericalAssumption
+from lyra.abstract_domains.quality.assumption_lattice import AssumptionGraph, AssumptionNode, NumericalAssumption
 from lyra.core.types import FloatLyraType, BooleanLyraType, IntegerLyraType, StringLyraType, ListLyraType
 
 

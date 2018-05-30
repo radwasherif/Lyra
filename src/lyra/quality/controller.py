@@ -53,6 +53,7 @@ class Controller (metaclass= ABCMeta):
     def run(self):
         """ Run the controller """
         self.analysis_result = self.run_analysis()
+        # print(self.analysis_result)
         # self.write_result()
         # errors = self.run_checker()
         # for err in errors:

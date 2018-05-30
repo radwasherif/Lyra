@@ -118,7 +118,7 @@ In order to have the relationships in the Store we need a lattice object. We can
     \item State before:
     \begin{itemize}
         \item var name: VAR
-        \item Assumption: VAR $\rightarrow$ (Type1, Range1)
+        \item AssumptionNode: VAR $\rightarrow$ (Type1, Range1)
         \item Relationship: [(rel1, (+, VAR, 10, +, other), rel3)]
         \item Input: []
     \end{itemize}
@@ -126,7 +126,7 @@ In order to have the relationships in the Store we need a lattice object. We can
     \item State after:
     \begin{itemize}
         \item var name: VAR
-        \item Assumption: VAR $\rightarrow$ TOP
+        \item AssumptionNode: VAR $\rightarrow$ TOP
         \item Relationship: [(rel1, rel3)]
         \item Input: [(1, (Type1, Range1), (+, id:1, 10, +, other))]
     \end{itemize}
@@ -158,7 +158,7 @@ Tasks:
 \end{itemize}
 
 
-\subsection{Input Assumption Join}
+\subsection{Input AssumptionNode Join}
 
 Problem: if I join an if and else where we have different inputs (a = input() and b = input()) We need to invalidate all relationships further down the stack that have a relation with a or b.\\
 Solution: If i join a = input() and b = input() it means that I already substituted the input\_ids for all relations containing a and b. When I then join them later I see that one has info, one does not, and can handle that problem there.

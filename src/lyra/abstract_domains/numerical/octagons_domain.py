@@ -113,7 +113,7 @@ class ElinaLattice(Lattice):
         if(c is not None):
             cst = pointer(linexpr.contents.cst)
             # set the constant of the expression to c
-            elina_scalar_set_int(cst.contents.val.scalar, c_long(c))
+            elina_scalar_set_double(cst.contents.val.scalar, float(c))
             # set the variables and coefficients (signs) of the linear expression
         for i in range(size):
             linterm = pointer(linexpr.contents.p.linterm[i])
@@ -374,6 +374,7 @@ class OctagonState(State):
         pass
 
     def belong_here(self, vars):
+        print(vars)
         return all(var in self.variables for var in vars)
     # ==================================================
     #             HEURISTICS
@@ -409,7 +410,7 @@ class OctagonState(State):
         :param condition: condition to be checked
         :return:
         '''
-        print(f"Checking condition {condition}")
+        # print(f"Checking condition  condition}")
         negation_free_normal = NegationFreeNormalExpression()
         normal_condition = negation_free_normal.visit(condition)
         vars, signs = [], []
@@ -430,7 +431,7 @@ class OctagonState(State):
         #calculate the total sum of all constants (Literals)
         for i, v in enumerate(vars):
             if(isinstance(v, Literal)):
-                constant += (signs[i] * (int(v.val)))
+                constant += (signs[i] * (float(v.val)))
                 idx_to_del.append(i)
 
         #remove Literals from array so that only variables remain

@@ -61,7 +61,7 @@ for i in range(iterations):
 \end{lstlisting}
 
 
-Assumption: $iterations \times [assmps]$\\
+AssumptionNode: $iterations \times [assmps]$\\
 
 Relationship of num\_iter of for loop with iterations. \\
 Idea: have a special "loop iteration variable" for every loop. We then can have [$iter_n\times[assmps]$] in the input assumption lattice. \\
@@ -74,7 +74,7 @@ for line in file:
 \end{lstlisting}
 
 
-Assumption: $ALL \times [assmps]$\\
+AssumptionNode: $ALL \times [assmps]$\\
 
 Need some means of telling that all rows in file should be the same\\
 
@@ -105,7 +105,7 @@ print(values[index])
 \end{lstlisting}
 
 
-Assumption: $[IN_1 = (Int, [-IN_2, IN_2-1]), (IN_2 = [IN_1+1, \infty]) \times [(Int, [-\infty, \infty])]\:with\:delimiter\:","]$\\
+AssumptionNode: $[IN_1 = (Int, [-IN_2, IN_2-1]), (IN_2 = [IN_1+1, \infty]) \times [(Int, [-\infty, \infty])]\:with\:delimiter\:","]$\\
 
 
 Problem: currently we have an assumption object for every variable in the store. When we have an octagon domain we have a matrix with the numerical relationships of all the variable so we cannot keep an assumption for every variable.\\
@@ -156,7 +156,7 @@ for i in range(a):
 \end{lstlisting}
 
 
-Assumption: $[IN_1 = (Int, ([-IN_2, IN_2-1], if IN_1 > 0)), (IN_2 = [IN_1+1, \infty],\:if\:IN_1 > 0) \times [(Int, [-\infty, \infty])]\:with\:delimiter\:","]$\\
+AssumptionNode: $[IN_1 = (Int, ([-IN_2, IN_2-1], if IN_1 > 0)), (IN_2 = [IN_1+1, \infty],\:if\:IN_1 > 0) \times [(Int, [-\infty, \infty])]\:with\:delimiter\:","]$\\
 
 
 If x comes from input we have the relation $a < len(values)$ otherwise we have $a < 3$. This is always true because if $a < 0$ the assumptions also hold. But to be correct we need to say ($a < len(values)$ if $a > 0$) because only then the loop is entered. In the case that we use $print(values[3])$ we only know that $len(values) > 3$ if $a > 0$. In that case the condition $len(values) > 3$ has no relation to the iteration condition variable $a$.\\
@@ -219,7 +219,7 @@ Important: You need to think about how to pull/push information from/to the octa
 \subsection{Information in JSON}
 
 \begin{itemize}
-  \item Assumption of a value. (assmp)
+  \item AssumptionNode of a value. (assmp)
   \item Delimiter of a line. (structure)
   \item Num of values in line. (structure)
   \item Num of iterations of certain lines. (structure)
@@ -407,7 +407,7 @@ InputAssumption: (V, AssumptionLattice, Octagon, Dict)
 \begin{itemize}
   \item \textit{N}: Number of times this assumption is repeated (with delimiter D in same line, otherwise multiple lines)
   \item \textit{V}: Variable name that is equal to input (a = input()). This is needed because when we need to apply the semantics we are not allowed to apply semantics of this variable because it is now an input and therefore not that variable anymore.
-  \item \textit{AssumptionLattice}: Assumption about that variable. Currently only shows the type. Could be extended with strings or 'cannot be zero'.
+  \item \textit{AssumptionLattice}: AssumptionNode about that variable. Currently only shows the type. Could be extended with strings or 'cannot be zero'.
   \item \textit{Octagon}: Current octagon object. It will be copied when a = input() is encountered (without applying a = input() on it).
   \item \textit{Dict}: Describes the relationship of a variable to an input. This is needed so that if we add the second variable of a relation to the input the first variable needs to know that now the relation is not with that variable anymore but with an other input.
   \item \textit{with delimiter D}: If the assumption holds for multiple values in a line.

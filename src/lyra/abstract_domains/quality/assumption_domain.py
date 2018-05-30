@@ -1,16 +1,13 @@
 from copy import deepcopy
 
-from lyra.abstract_domains.numerical.interval_domain import IntervalState
 from lyra.abstract_domains.numerical.octagons_domain import OctagonState
 from lyra.abstract_domains.quality.character_inclusion_domain import CharacterInclusionState
-from lyra.abstract_domains.quality.type_domain import TypeState
-from lyra.abstract_domains.store import Store
-from lyra.abstract_domains.stack import Stack
+from lyra.abstract_domains.quality.type_domain import TypeState, TopLyraType
 from lyra.abstract_domains.state import State
 from lyra.core.expressions import *
-from lyra.abstract_domains.quality.assumption_lattice import AssumptionGraph, Assumption
+from lyra.abstract_domains.quality.assumption_lattice import AssumptionGraph, AssumptionNode, AssumptionStack
 from lyra.core.statements import ProgramPoint
-from lyra.core.types import FloatLyraType, BooleanLyraType, IntegerLyraType, StringLyraType, ListLyraType
+from lyra.core.types import FloatLyraType, BooleanLyraType, IntegerLyraType, StringLyraType
 
 
 class AssumptionState(State):
@@ -37,12 +34,13 @@ class AssumptionState(State):
             new_state.states[k] = v.copy()
         new_state.stack = self.stack.copy()
         new_state.pp = deepcopy(self.pp)
-        if self.stack != new_state.stack:
-            print("NOT EQUAL", self.stack, new_state.stack)
+        # if self.states['string'] != new_state.states['string']:
+        #     raise ValueError(f"NOT EQUAL\n{self.states['string']}\n{new_state.states['string']}")
+        # assert self.states['string'] == new_state.states['string']
         return new_state
 
     def __repr__(self):
-        return f"types: {self.type_state}, states: {self.states}, stack: {self.stack}"
+        return f"types: {self.type_state},\n states: {self.states},\n stack: {self.stack}"
 
     def bottom(self):
         self.propagate_down("bottom")
@@ -101,7 +99,7 @@ class AssumptionState(State):
         return self
 
     def exit_loop(self) -> 'State':
-        self.pop()
+        self.stack.pop()
         return self
 
     def _output(self, output: Expression) -> 'State':
@@ -165,13 +163,18 @@ class AssumptionState(State):
                     disj = disj or result
         return conj, disj
 
-    def get_key(self, typ):
+    def get_key(self, typ: LyraType=None, var: VariableIdentifier=None):
+        var_type = typ
+        if typ is None:
+            var_type = self.type_state.get_type(var)
+            if isinstance(var_type, TopLyraType):
+                var_type = var.typ
         for k, v in self.types.items():
-            if typ in v:
+            if var_type in v:
                 return k
 
     def handle_input(self, variable: Expression, right: Expression):
-        category = self.get_key(self.type_state.get_type(variable))
+        category = self.get_key(var=variable)
         # get lattice element, this is lost after substitution
         lattice_element = self.states[category].forget_variable(variable)
         # perform substitution for the type
@@ -179,73 +182,20 @@ class AssumptionState(State):
         # get type lattice element, this is updated only after substitution
         type_element = self.type_state.forget_variable(variable)
         # associate assumption with line number
-        assumption = Assumption(id=self.pp.line, lattice_elements=[type_element, lattice_element])
+        assumption = AssumptionNode(id=self.pp.line, lattice_elements=(type_element, lattice_element))
         # prepend assumption to top layer of stack
         self.stack.top_layer(prepend=assumption)
         # replace variable in stack with the line number from which it is read
-        print(f"STACK BEFORE REPLACE {variable}", self.stack)
         self.stack.replace_variable(variable, self.pp)
-        print(f"STACK AFTER REPLACE {variable}", self.stack)
 
 
     def type_change(self, variable: Identifier, new_type:LyraType, old_type:LyraType):
-        old_category = self.get_key(old_type)
-        new_category = self.get_key(new_type)
+        old_category = self.get_key(typ=old_type)
+        new_category = self.get_key(typ=new_type)
         # if substitution changes type, then replace variable in appropriate domain
         if old_category != new_category and old_category is not None and new_category is not None:
             if old_category is not None:
                 self.states[old_category].remove_variable(variable)
             self.states[new_category].add_variable(variable)
-
-
-class AssumptionStack(Stack):
-
-    def __init__(self, typ: AssumptionGraph):
-        super().__init__(typ, {})
-
-    def _assume(self, condition: Expression):
-        pass
-
-    def _substitute(self, left: Expression, right: Expression):
-        pass
-
-    def raise_error(self):
-        pass
-
-    def push(self):
-        self.stack.append(AssumptionGraph())
-        return self
-
-    def copy(self):
-        new_stack = AssumptionStack(AssumptionGraph)
-        array = []
-        for element in self.stack:
-            array.append(element.copy())
-        new_stack.stack = array
-        return new_stack
-
-    def pop(self):
-        upper = self.stack.pop(-1)
-        lower = None
-        if len(self.stack) > 0:
-            lower = self.stack.pop(-1)
-
-        # combine the two top elements to make one element
-        new_top = upper.combine(lower)
-        # push new element to top of stack
-        self.stack.append(new_top)
-        return self
-
-    def replace_variable(self, variable: Identifier, pp: ProgramPoint):
-        for element in self.stack:
-            element.replace_variable(variable, pp)
-
-    def top_layer(self, is_loop: bool=None, condition: Expression=None, prepend:Assumption=None):
-        if is_loop is not None:
-            self.stack[-1].is_loop = is_loop
-        if condition is not None:
-            self.stack[-1].condition = condition
-        if prepend is not None:
-            self.stack[-1].add_assumption(prepend)
 
 

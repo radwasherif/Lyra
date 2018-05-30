@@ -1,3 +1,4 @@
+import glob
 import os
 from lyra.quality.controller import Controller
 from lyra.engine.quality.assumption_analysis import AssumptionAnalysis
@@ -12,6 +13,9 @@ class AssumptionController(Controller):
 
 
 if __name__ == "__main__":
-    path = os.getcwd() + '/example'
-    name = 'checker_example'
-    AssumptionController(AssumptionAnalysis(), InputChecker(), JSONHandler(), path, name).run()
+    name = os.getcwd() + '/example/**.py'
+    for path in glob.iglob(name):
+        if os.path.basename(path) != "__init__.py":
+            path, name = os.path.split(path)
+            name = name.split(".")[0]
+            AssumptionController(AssumptionAnalysis(), InputChecker(), JSONHandler(), path, name).run()

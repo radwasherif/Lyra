@@ -63,7 +63,7 @@
 \subsection{Problem IntervalState and AssumptionState}
 
 We have information about ranges from IntervalState: $a = b + 1$ with $a = 5$ therefore $a = TOP, b = 4$. We want to use exactly this information. From the AssumptionState we come back with the same information as before: $a = 5, b = TOP$.\\
-On the other hand we might get information from Assumption state: $a = list[1] + 1$ therefore $len_{list} > 1$. From the IntervalState we get $a = TOP$. Here we want to use the information from Assumption State.\\
+On the other hand we might get information from AssumptionNode state: $a = list[1] + 1$ therefore $len_{list} > 1$. From the IntervalState we get $a = TOP$. Here we want to use the information from AssumptionNode State.\\
 One possible idea is to meet the assumption from both states. This would not work: We would get $a = a + 1$ with $a = [5, 10}$ therefore $a = [4, 9]$ from the IntervalState and $a = [5, 10]$ from the AssumptionState and end up with $[4, 9] \sqcap [5, 10] = [5, 9]$. In reality we want to keep the information from the IntervalState.\\
 An other idea is to first get assumption from the AssumptionState and use that information to substitute in the IntervalState. The problem is that the IntervalState now uses information that might already be too "new".\\
 IntervalState just gives information about transitions of values. Whereas the AssumptionState tries to add new assumptions. So the IntervalState shows what really is happening and the AssumptionState tries to find new assumptions. So it should be possible to first get information from the IntervalState and then use that information and try to apply possible new assumptions.
@@ -120,7 +120,7 @@ The bounds use an expression lattice of the form v + k where v is a variable and
 \item \textit{widening}: as described in paper, 1) purification (remove bounds that appear only in one, except constants), 2) segment-wise unification of bounds, 3) widening of elements
 \end{itemize}
 
-\section{Lattice - Assumption}
+\section{Lattice - AssumptionNode}
 
 \begin{itemize}
 \item \textit{\_\_repr\_\_}: (NAME of type, [x,y] as range, input)
@@ -171,7 +171,7 @@ list of elements (that can be lists) with an information about separation of val
 \end{itemize}
 
 
-\section{State - Backwards Assumption Analysis}
+\section{State - Backwards AssumptionNode Analysis}
 
 \begin{itemize}
 \item \textit{access\_variable}: return current assumption
@@ -195,7 +195,7 @@ list of elements (that can be lists) with an information about separation of val
 \end{itemize}
 
 
-\section{State - Backwards Assumption Analysis (without List Abstraction)}
+\section{State - Backwards AssumptionNode Analysis (without List Abstraction)}
 
 \begin{itemize}
 \item \textit{assign\_variable}: not in backwards analysis
@@ -223,7 +223,7 @@ list of elements (that can be lists) with an information about separation of val
 \end{itemize}
 
 
-\section{Refinement - Backwards Assumption Analysis (without List Abstraction)}
+\section{Refinement - Backwards AssumptionNode Analysis (without List Abstraction)}
 
 \begin{itemize}
 \item \textit{visit Subscription}: nothing to do

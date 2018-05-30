@@ -1,8 +1,9 @@
 from copy import deepcopy
 from enum import IntEnum
-from typing import List
+from typing import List, Tuple
 
 from lyra.abstract_domains.lattice import Lattice
+from lyra.abstract_domains.stack import Stack
 from lyra.abstract_domains.state import State
 from lyra.abstract_domains.numerical.interval_domain import IntervalState, IntervalLattice
 from lyra.core.statements import ProgramPoint
@@ -10,7 +11,8 @@ from lyra.core.types import LyraType, IntegerLyraType
 
 from abc import ABCMeta, abstractmethod
 
-from lyra.core.expressions import Expression, Literal, VariableIdentifier, Identifier
+from lyra.core.expressions import Expression, Literal, VariableIdentifier, Identifier, UnaryBooleanOperation, \
+    BinaryComparisonOperation, Range
 
 
 class TypeLattice(State):
@@ -111,9 +113,9 @@ class TypeLattice(State):
         pass
 
 
-class Assumption(Lattice):
+class AssumptionNode(Lattice):
 
-    def __init__(self, id: int, lattice_elements: List[Lattice]):
+    def __init__(self, id: int, lattice_elements: Tuple[Lattice]):
         super().__init__()
         self._id = id
         self.lattice_elements = lattice_elements
@@ -143,11 +145,12 @@ class Assumption(Lattice):
     def is_top(self) -> bool:
         return all(element.is_top() for element in self.lattice_elements)
 
-    def _less_equal(self, other: 'Assumption') -> bool:
+    def _less_equal(self, other: 'AssumptionNode') -> bool:
         return all(element.less_equal(other_element) if type(element) is type(other_element) else False for
                    element, other_element in zip(self.lattice_elements, other.lattice_elements))
 
-    def _join(self, other: 'Assumption') -> 'Assumption':
+    def _join(self, other: 'AssumptionNode') -> 'AssumptionNode':
+        self.id = min(self.id, other.id)
         for element, other_element in zip(self.lattice_elements, other.lattice_elements):
             if type(element) is type(other_element):
                 element.join(other_element)
@@ -155,7 +158,8 @@ class Assumption(Lattice):
                 element.top()
         return self
 
-    def _meet(self, other: 'Assumption'):
+    def _meet(self, other: 'AssumptionNode'):
+        self.id = max(self.id, other.id)
         for element, other_element in zip(self.lattice_elements, other.lattice_elements):
             if type(element) is type(other_element):
                 element.meet(other_element)
@@ -163,7 +167,7 @@ class Assumption(Lattice):
                 element.top()
         return self
 
-    def _widening(self, other: 'Assumption'):
+    def _widening(self, other: 'AssumptionNode'):
         self.join(other)
         return self
 
@@ -171,7 +175,7 @@ class Assumption(Lattice):
         array = []
         for element in self.lattice_elements:
             array.append(element.copy())
-        return Assumption(self.id, array)
+        return AssumptionNode(self.id, array)
 
     def replace_variable(self, variable: Identifier, pp: ProgramPoint):
         for element in self.lattice_elements:
@@ -179,7 +183,6 @@ class Assumption(Lattice):
 
 
 class AssumptionGraph(Lattice):
-
     def __init__(self):
         """
 
@@ -196,7 +199,7 @@ class AssumptionGraph(Lattice):
         return self.copy_helper(self)
 
     def bottom(self):
-        self.traverse(self, "bottom")
+        self.assumptions = []
         return self
 
     def top(self):
@@ -204,21 +207,20 @@ class AssumptionGraph(Lattice):
         return self
 
     def is_bottom(self) -> bool:
-        _, disj = self.traverse(self, "is_bottom")
-        return disj
+        return len(self.assumptions) == 0
 
     def is_top(self) -> bool:
         conj, _ = self.traverse(self, "is_top")
+        return conj
 
     def _less_equal(self, other: 'AssumptionGraph') -> bool:
         if self.is_bottom() or other.is_top():
             return True
         if self.is_top() or other.is_bottom():
             return False
-        try:
-            conj, _ = self.traverse(self, "_less_equal", other=other)
-        except Exception:
-            return False
+        conj, _ = self.traverse(self, "_less_equal", other=other)
+        return conj
+
 
     def _join(self, other: 'AssumptionGraph') -> 'AssumptionGraph':
         if self.is_bottom() or other.is_top():
@@ -254,21 +256,24 @@ class AssumptionGraph(Lattice):
     # =============================================
 
     def copy_helper(self, this: Lattice):
-        if isinstance(this, Assumption):
+        if isinstance(this, AssumptionNode):
             return this.copy()
         result = AssumptionGraph()
         result.mult = deepcopy(this.mult)
         result.condition = deepcopy(this.condition)
         result.is_loop = deepcopy(this.is_loop)
-        result.assumptions = []
-        for element in this.assumptions:
-            result.assumptions.append(self.copy_helper(element))
+        if self.assumptions is None:
+            result.assumptions = None
+        else:
+            result.assumptions = []
+            for element in this.assumptions:
+                result.assumptions.append(self.copy_helper(element))
         return result
 
     def to_string(self, graph):
-        if isinstance(graph, Assumption):
+        if isinstance(graph, AssumptionNode):
             return repr(graph)
-        return "(" + str(graph.mult) + ", [" + ",".join([self.to_string(assmp) for assmp in graph.assumptions]) + "])"
+        return str(graph.mult) + " x [" + ",".join([self.to_string(assmp) for assmp in graph.assumptions]) + "]"
 
     def traverse(self, graph, func, *args, other=None):
         """
@@ -278,7 +283,7 @@ class AssumptionGraph(Lattice):
         :return:
         """
         if other is None:
-            if isinstance(graph, Assumption):
+            if isinstance(graph, AssumptionNode):
                 return getattr(graph, func)(*args)
             conj, disj = True, False
             for assmp in graph.assumptions:
@@ -288,7 +293,7 @@ class AssumptionGraph(Lattice):
                     disj = disj or result
             return conj, disj
         else:
-            if isinstance(graph, Assumption) and isinstance(other, Assumption):
+            if isinstance(graph, AssumptionNode) and isinstance(other, AssumptionNode):
                 return getattr(graph, func)(other)
             elif isinstance(graph, AssumptionGraph) and isinstance(other, AssumptionGraph):
                 conj, disj = True, False
@@ -309,18 +314,82 @@ class AssumptionGraph(Lattice):
         """
 
         if self.is_loop:
-            self.mult = self.condition
+            self.mult = self.get_mult(self.condition)
         if lower is not None:
-            if len(lower.assumptions) == 0 and len(self.assumptions) == 0:
+            if len(self.assumptions) == 0:
                 return self
             lower.assumptions.append(self)
             return lower
-        return self
 
-    def add_assumption(self, assumption: Assumption):
+    def add_assumption(self, assumption: AssumptionNode):
         """
         Prepends new assumption to the front of assumption list
         :param assumption:
         :return:
         """
         self.assumptions = [assumption] + self.assumptions
+
+    def get_mult(self, condition: 'Expression'):
+        if isinstance(condition, UnaryBooleanOperation):
+            condition = condition.expression
+        if isinstance(condition, BinaryComparisonOperation):
+            condition = condition.right
+        if isinstance(condition, Range):
+            val = int(condition.end.val) - int(condition.start.val)
+            return Literal(IntegerLyraType, str(val))
+
+class AssumptionStack(Stack):
+
+    def __init__(self, typ: AssumptionGraph):
+        super().__init__(typ, {})
+
+    def _assume(self, condition: Expression):
+        pass
+
+    def _substitute(self, left: Expression, right: Expression):
+        pass
+
+    def raise_error(self):
+        pass
+
+    def push(self):
+        self.stack.append(AssumptionGraph().top())
+        return self
+
+    def copy(self):
+        new_stack = AssumptionStack(AssumptionGraph)
+        array = []
+        for element in self.stack:
+            array.append(element.copy())
+        new_stack.stack = array
+        return new_stack
+
+    def pop(self):
+        # print("POPPING", self)
+        upper = self.stack.pop(-1)
+        lower = None
+        if len(self.stack) > 0:
+            lower = self.stack.pop(-1)
+        # print("UPPER", upper)
+        # print("LOWER", lower)
+        # print("AFTER", self)
+        # combine the two top elements to make one element
+        new_top = upper.combine(lower)
+        # print("NEW TOP", new_top)
+        # push new element to top of stack
+        if new_top is not None:
+            self.stack.append(new_top)
+        # print("NEW STACK", self)
+        return self
+
+    def replace_variable(self, variable: Identifier, pp: ProgramPoint):
+        for element in self.stack:
+            element.replace_variable(variable, pp)
+
+    def top_layer(self, is_loop: bool=None, condition: Expression=None, prepend:AssumptionNode=None):
+        if is_loop is not None:
+            self.stack[-1].is_loop = is_loop
+        if condition is not None:
+            self.stack[-1].condition = condition
+        if prepend is not None:
+            self.stack[-1].add_assumption(prepend)

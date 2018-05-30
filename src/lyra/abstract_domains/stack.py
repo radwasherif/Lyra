@@ -60,6 +60,7 @@ class Stack(BoundedLattice, metaclass=ABCMeta):
 
     @copy_docstring(BoundedLattice._less_equal)
     def _less_equal(self, other: 'Stack') -> bool:
+        print("YA RABBYYYY")
         """The comparison is performed point-wise for each stack element."""
         if len(self.stack) != len(other.stack):
             raise Exception("Stacks must be equally long")
