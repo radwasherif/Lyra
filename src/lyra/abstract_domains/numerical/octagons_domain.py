@@ -176,10 +176,6 @@ class ElinaLattice(Lattice):
         :param dim: dimension whose constraints should be returned
         :return: new Elina object with constraints related to a certain variable
         """
-        # call closure to make sure all possible constraints are captured
-        self.abstract = elina_abstract0_closure(self.man, False, self.abstract)
-        # equate Elina abstract with ELina lincons_array
-        self.equate()
         size = 0
         # allocate new lincons_array
         lincons_array = elina_lincons0_array_make(size)
@@ -205,15 +201,14 @@ class ElinaLattice(Lattice):
                     break
         new_elina = ElinaLattice(dim=len(new_dict), idx_to_varname=new_dict)
         new_elina.lincons_array = lincons_array
-        new_elina.abstract = elina_abstract0_of_lincons_array(new_elina.man, size, 0, lincons_array)
-        # if self.idx_to_varname[dim] == 'x':
-        #     print("SIZE", size)
-        #     self.print_constraints(f"original{dim}")
-        #     print("after extraction")
-        #     elina_lincons0_array_print(lincons_array, None)
-        #     new_elina.print_constraints("NEW ELINA")
-        #     print(elina_abstract0_is_top(new_elina.man, new_elina.abstract))
-        #     print(new_elina.is_top())
+        print(self.idx_to_varname)
+        top = elina_abstract0_top(new_elina.man, self.dim, 0)
+        # This step below gives top
+        elina_lincons0_array_print(lincons_array, None)
+        new_elina.abstract = elina_abstract0_meet_lincons_array(new_elina.man, False, top, lincons_array)
+        # new_elina.print_constraints(f"CONS {dim}")
+        print("NEW ELINA", new_elina)
+        print("IS TOP", new_elina.is_top())
         return new_elina
 
 
@@ -230,8 +225,8 @@ class ElinaLattice(Lattice):
 
     def print_constraints(self, message: str):
         print(message)
+        print("constraints")
         elina_lincons0_array_print(self.lincons_array, None)
-        print("-----------------------------------------------------------")
 
     def to_string (self):
         lincons_array = self.lincons_array
@@ -279,7 +274,12 @@ class OctagonState(State):
     def _assume(self, condition: Expression) -> 'State':
         if not self.belong_here(condition.ids()):
             return self
-        return self._meet(condition)
+        # print("BEFORE assume", condition)
+        # print(self)
+        self._meet(condition)
+        # print("AFTER ASSUME")
+        # print(self)
+        return self
 
     def enter_if(self) -> 'OctagonState':
         return self
@@ -358,7 +358,9 @@ class OctagonState(State):
 
     def forget_variable(self, variable: VariableIdentifier):
         dim = self.varname_to_idx[variable.name]
+        print("IN FORGET", variable, dim)
         element = self.elina.extract_dim(dim)
+        print("ELEMENT", element)
         self.elina.project(dim)
         return element
 
@@ -374,7 +376,6 @@ class OctagonState(State):
         pass
 
     def belong_here(self, vars):
-        print(vars)
         return all(var in self.variables for var in vars)
     # ==================================================
     #             HEURISTICS

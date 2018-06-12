@@ -1,5 +1,8 @@
 import glob
 import os
+
+from lyra.abstract_domains.numerical.interval_domain import IntervalState
+from lyra.abstract_domains.quality.character_inclusion_domain import CharacterInclusionState
 from lyra.quality.controller import Controller
 from lyra.engine.quality.assumption_analysis import AssumptionAnalysis
 from lyra.quality_analysis.input_checker import InputChecker
@@ -18,4 +21,4 @@ if __name__ == "__main__":
         if os.path.basename(path) != "__init__.py":
             path, name = os.path.split(path)
             name = name.split(".")[0]
-            AssumptionController(AssumptionAnalysis(), InputChecker(), JSONHandler(), path, name).run()
+            AssumptionController(AssumptionAnalysis(IntervalState, CharacterInclusionState), InputChecker(), JSONHandler(), path, name).run()

@@ -9,3 +9,4 @@ else:
             b: int = int(input())
         else:
             b: int = float(input())
+

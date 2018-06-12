@@ -372,10 +372,13 @@ bool elina_abstract0_check_lincons_array(elina_funid_t funid, elina_manager_t* m
       elina_manager_raise_exception(man,
 				 ELINA_EXC_INVALID_ARGUMENT,
 				 funid,str);
+	printf("first branch");
       return false;
     }
     elina_dim_t dim = elina_abstract0_check_linexpr_check(dimension,array->p[i].linexpr0);
     if (dim!=ELINA_DIM_MAX){
+       elina_lincons0_array_fprint(stdout, array, NULL);
+       printf("second branch");
       char str[80];
       sprintf(str,"incompatible dimension in the %luth constraint of the array",(unsigned long)i);
       elina_abstract0_check_expr_raise(funid,man,dimension,dim,str);
@@ -985,6 +988,7 @@ elina_abstract0_t* elina_abstract0_meet_lincons_array(elina_manager_t* man,
     return elina_abstract0_cons2(man,destructive,a,value);
   }
   else {
+  printf("Radwa");
     if (destructive) _elina_abstract0_free(a);
     return elina_abstract0_top(man,
 			    dimension.intdim,

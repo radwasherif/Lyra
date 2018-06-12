@@ -10,10 +10,12 @@ from lyra.semantics.backward import DefaultBackwardSemantics
 
 class AssumptionAnalysis(Runner):
 
-    def __init__(self, do_render=True, show_simple=False):
+    def __init__(self, numerical_domain, string_domain, do_render=True, show_simple=False):
         super().__init__()
         self.do_render = do_render
         self.show_simple = show_simple
+        self.numerical_domain = numerical_domain
+        self.string_domain = string_domain
 
     @property
     def variables(self) -> List[Identifier]:
@@ -30,7 +32,7 @@ class AssumptionAnalysis(Runner):
         return BackwardInterpreter(self.cfg, DefaultBackwardSemantics(), 3)
 
     def state(self):
-        return AssumptionState(self.variables)
+        return AssumptionState(self.variables, self.numerical_domain, self.string_domain)
 
     def run(self):
         result = self.interpreter().analyze(self.state())

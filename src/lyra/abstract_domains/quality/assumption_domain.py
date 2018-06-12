@@ -5,28 +5,31 @@ from lyra.abstract_domains.quality.character_inclusion_domain import CharacterIn
 from lyra.abstract_domains.quality.type_domain import TypeState, TopLyraType
 from lyra.abstract_domains.state import State
 from lyra.core.expressions import *
-from lyra.abstract_domains.quality.assumption_lattice import AssumptionGraph, AssumptionNode, AssumptionStack
+from lyra.abstract_domains.quality.assumption_graph import AssumptionGraph, AssumptionNode
+from lyra.abstract_domains.quality.assumption_stack import AssumptionStack
 from lyra.core.statements import ProgramPoint
 from lyra.core.types import FloatLyraType, BooleanLyraType, IntegerLyraType, StringLyraType
 
 
 class AssumptionState(State):
 
-    def __init__(self, variables: List[VariableIdentifier]):
+    def __init__(self, variables: List[VariableIdentifier], numerical_domain, string_domain):
         self.states = {}
         self.types = {
             "numerical": [IntegerLyraType(), FloatLyraType(), BooleanLyraType()],
             "string": [StringLyraType()]
         }
         self.variables = variables
+        self.numerical_domain = numerical_domain
+        self.string_domain = string_domain
         self.type_state = TypeState(variables)
-        self.states["numerical"] = OctagonState([v for v in variables if v.typ in self.types["numerical"]])
-        self.states["string"] = CharacterInclusionState([v for v in variables if v.typ in self.types["string"]])
+        self.states["numerical"] = numerical_domain([v for v in variables if v.typ in self.types["numerical"]])
+        self.states["string"] = string_domain([v for v in variables if v.typ in self.types["string"]])
         self.stack = AssumptionStack(AssumptionGraph)
         self.pp = 0
 
     def copy(self):
-        new_state = AssumptionState(self.variables)
+        new_state = AssumptionState(self.variables, self.numerical_domain, self.string_domain)
         new_state.states = {}
         new_state.types = deepcopy(self.types)
         new_state.type_state = self.type_state.copy()
@@ -58,7 +61,6 @@ class AssumptionState(State):
         conj, _ = self.propagate_down("is_top")
         return conj
 
-    # TODO add less_equal for stack
     def _less_equal(self, other: 'AssumptionState') -> bool:
         conj, _ = self.propagate_down("_less_equal", other=other)
         return conj
@@ -94,11 +96,12 @@ class AssumptionState(State):
         return self
 
     def enter_loop(self) -> 'State':
-        self.stack.push()
         self.stack.top_layer(is_loop=True)
+        self.stack.push()
         return self
 
     def exit_loop(self) -> 'State':
+        self.stack.top_layer(is_loop=True)
         self.stack.pop()
         return self
 
@@ -154,6 +157,7 @@ class AssumptionState(State):
                     conj = conj and result
                     disj = disj or result
         else:
+            s = getattr(self.stack, func)(other.stack)
             disj = getattr(self.type_state, func)(other.type_state) or getattr(self.stack, func)(other.stack)
             conj = getattr(self.type_state, func)(other.type_state) and getattr(self.stack, func)(other.stack)
             for state, other_state in zip(self.states.values(), other.states.values()):
@@ -174,6 +178,7 @@ class AssumptionState(State):
                 return k
 
     def handle_input(self, variable: Expression, right: Expression):
+        # print("INPUT", variable)
         category = self.get_key(var=variable)
         # get lattice element, this is lost after substitution
         lattice_element = self.states[category].forget_variable(variable)
@@ -183,6 +188,7 @@ class AssumptionState(State):
         type_element = self.type_state.forget_variable(variable)
         # associate assumption with line number
         assumption = AssumptionNode(id=self.pp.line, lattice_elements=(type_element, lattice_element))
+        # print("ASSUMPTION", assumption)
         # prepend assumption to top layer of stack
         self.stack.top_layer(prepend=assumption)
         # replace variable in stack with the line number from which it is read

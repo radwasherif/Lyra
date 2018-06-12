@@ -194,12 +194,12 @@ opt_oct_t* opt_oct_meet_lincons_array(elina_manager_t* man,
 {
   //printf(".");
   //fflush(stdout);
-  //printf("meet lincons INPUT\n");
-  //elina_lincons0_array_t arr1 = opt_oct_to_lincons_array(man,o);
-  //elina_lincons0_array_fprint(stdout,&arr1,NULL);
-  //elina_lincons0_array_clear(&arr1);
-  //elina_lincons0_array_fprint(stdout,array,NULL);
-  //fflush(stdout);
+  printf("meet lincons INPUT\n");
+  elina_lincons0_array_t arr1 = opt_oct_to_lincons_array(man,o);
+  elina_lincons0_array_fprint(stdout,&arr1,NULL);
+  elina_lincons0_array_clear(&arr1);
+  elina_lincons0_array_fprint(stdout,array,NULL);
+  fflush(stdout);
   opt_oct_internal_t* pr =
     opt_oct_init_from_manager(man,ELINA_FUNID_MEET_LINCONS_ARRAY,2*(o->dim+8));
   if (!o->closed && !o->m)
@@ -239,10 +239,10 @@ opt_oct_t* opt_oct_meet_lincons_array(elina_manager_t* man,
 	opt_oct_t * r;
       if (respect_closure) r = opt_oct_set_mat(pr,o,NULL,oo,destructive);
       else r = opt_oct_set_mat(pr,o,oo,NULL,destructive);
-	/*printf("meet lincons OUT\n");
+	printf("meet lincons OUT\n");
   elina_lincons0_array_t arr2 = opt_oct_to_lincons_array(man,r);
   elina_lincons0_array_fprint(stdout,&arr2,NULL);
-  elina_lincons0_array_clear(&arr2);*/
+  elina_lincons0_array_clear(&arr2);
 	return r;
     }
   }

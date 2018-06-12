@@ -5,5 +5,5 @@ if a > 10:
 else:
     for i in range(20):
         c: int = int(input())
-
+x: float = float(input())
 

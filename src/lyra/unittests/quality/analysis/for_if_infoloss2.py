@@ -9,4 +9,6 @@ for i in range(20):
         c: int = float(input())
 
 
+x: str = input()
+y: float = float(input())
 

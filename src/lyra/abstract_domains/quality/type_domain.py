@@ -110,17 +110,17 @@ class TypeLattice(Lattice):
         return self.type_element == self.types[-1]
 
     def _less_equal(self, other: 'TypeLattice') -> bool:
-        return self.types.index(self.type_element) <= other.types.index(self.type_element)
+        return self.types.index(self.type_element) <= other.types.index(other.type_element)
 
     def _join(self, other: 'TypeLattice') -> 'TypeLattice':
         idx1 = self.types.index(self.type_element)
-        idx2 = self.types.index(self.type_element)
+        idx2 = self.types.index(other.type_element)
         self.replace(TypeLattice(self.types[max(idx1, idx2)]))
         return self
 
     def _meet(self, other: 'TypeLattice') -> 'TypeLattice':
         idx1 = self.types.index(type(self.type_element))
-        idx2 = self.types.index(type(self.type_element))
+        idx2 = self.types.index(type(other.type_element))
         self.replace(TypeLattice(self.types[min(idx1, idx2)]))
         return self
 

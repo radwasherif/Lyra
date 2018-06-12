@@ -16,6 +16,7 @@ from lyra.abstract_domains.lattice import BottomMixin, ArithmeticMixin
 from lyra.abstract_domains.state import State
 from lyra.abstract_domains.store import Store
 from lyra.core.expressions import *
+from lyra.core.statements import ProgramPoint
 
 from lyra.core.utils import copy_docstring
 from lyra.core.types import BooleanLyraType, IntegerLyraType, FloatLyraType
@@ -38,6 +39,7 @@ class IntervalLattice(BottomMixin, ArithmeticMixin):
     .. automethod:: IntervalLattice._sub
     .. automethod:: IntervalLattice._mult
     """
+
     def __init__(self, lower=-inf, upper=inf):
         super().__init__()
         if lower <= upper:      # the interval is not empty
@@ -147,6 +149,9 @@ class IntervalLattice(BottomMixin, ArithmeticMixin):
         lower = min(ac, ad, bc, bd)
         upper = max(ac, ad, bc, bd)
         return self.replace(IntervalLattice(lower, upper))
+
+    def replace_variable(self, variable: Identifier, pp: ProgramPoint):
+        pass
 
 
 class IntervalState(Store, State):
@@ -283,6 +288,9 @@ class IntervalState(Store, State):
 
     def remove_variable(self, variable: VariableIdentifier):
         self.store.pop(variable)
+
+    def replace_variable(self, variable: Identifier, pp: ProgramPoint):
+        pass
 
     # expression evaluation
 
