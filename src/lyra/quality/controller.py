@@ -4,6 +4,7 @@
     A controller class responsible for running data quality analysis, checkers and outputting results
 
 """
+import os
 from abc import ABCMeta
 from lyra.engine.runner import Runner
 from lyra.quality.checker import Checker
@@ -12,14 +13,14 @@ from lyra.quality.handler import ResultHandler
 
 class Controller (metaclass= ABCMeta):
 
-    def __init__(self, analysis_runner: Runner, checker: Checker, result_handler: ResultHandler, path: str, name: str):
+    def __init__(self, analysis_runner: Runner, checker: Checker, result_handler: ResultHandler, canonical_path: str):
         super().__init__()
         self.analysis_runner = analysis_runner
         self.result_handler = result_handler
         self.checker = checker
         self.checker.controller = self
-        self.program_path = path
-        self.program_name = name
+        self.program_path, name = os.path.split(canonical_path)
+        self.program_name = name.split(".")[0]
         self.analysis_result = None
 
     @property
@@ -54,7 +55,8 @@ class Controller (metaclass= ABCMeta):
         """ Run the controller """
         self.analysis_result = self.run_analysis()
         # print(self.analysis_result)
-        # self.write_result()
+        self.write_result()
+        # self.read_result()
         # errors = self.run_checker()
         # for err in errors:
         #     print(err)

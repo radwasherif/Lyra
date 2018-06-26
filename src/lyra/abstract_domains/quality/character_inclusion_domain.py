@@ -86,6 +86,7 @@ class CharacterInclusionState(Store, State):
                 raise ValueError("This shouldn't happen.")
             v.check_for_none()
 
+
 class CharacterInclusionLattice(Lattice):
 
     def __init__(self, certainly: Expression=None, maybe: Expression=None):
@@ -132,13 +133,8 @@ class CharacterInclusionLattice(Lattice):
 
     # TODO define order properly
     def _less_equal(self, other: 'CharacterInclusionLattice') -> bool:
-        self.check_for_none()
-        if self.is_top() or other.is_bottom():
-            return False
-        if self.is_bottom() or other.is_top():
-            return True
-        self.check_for_none()
-        return False
+        res = self.issubset(other.certainly, self.certainly) and self.issubset(self.maybe, other.maybe)
+        return res
 
     def _join(self, other: 'CharacterInclusionLattice') -> 'CharacterInclusionLattice':
         self.check_for_none()
@@ -176,23 +172,58 @@ class CharacterInclusionLattice(Lattice):
         return self
 
     def union(self, expr1: 'Expression', expr2: 'Expression'):
-        self.check_for_none()
         if isinstance(expr1, CharSet) and isinstance(expr2, CharSet):
             return CharSet(expr1.value.union(expr2.value))
-        self.check_for_none()
+        simple = self.simplify(expr1, expr2, BinarySetOperation.Operator.Union)
+        if simple is not None:
+            return simple
         return BinarySetOperation(StringLyraType, expr1, BinarySetOperation.Operator.Union, expr2)
 
     def intersection(self, expr1: 'Expression', expr2: 'Expression'):
-        self.check_for_none()
         if isinstance(expr1, CharSet) and isinstance(expr2, CharSet):
             return CharSet(expr1.value.intersection(expr2.value))
-        self.check_for_none()
+        simple = self.simplify(expr1, expr2, BinarySetOperation.Operator.Intersection)
+        if simple is not None:
+            return simple
         return BinarySetOperation(StringLyraType, expr1, BinarySetOperation.Operator.Intersection, expr2)
+
+    def simplify(self, expr1: 'Expression', expr2: 'Expression', operator: 'BinarySetOperation.Operator'):
+        if type(expr1) is type(expr2) and expr1 == expr2:
+            return deepcopy(expr1)
+        if isinstance(expr1, BinarySetOperation) and isinstance(expr2, BinarySetOperation):
+            if type(expr1.left) is type(expr1.right) and type(expr1.right) is type(expr2.left) and expr1.left == expr2.right and expr1.right == expr2.left:
+                return deepcopy(expr1)
+        if isinstance(expr1, BinarySetOperation):
+            if (type(expr2) is type(expr1.left) or type(expr2) is type(expr1.right)) and (expr2 == expr1.left or expr2 == expr1.right):
+                if expr1.operator == operator:
+                    return deepcopy(expr1)
+                else:
+                    return deepcopy(expr2)
+        if isinstance(expr2, BinarySetOperation):
+            if (type(expr1) is type(expr2.left) or type(expr1) is type(expr2.right)) and (expr1 == expr2.left or expr1 == expr2.right):
+                if expr2.operator == operator:
+                    return deepcopy(expr2)
+                else:
+                    return deepcopy(expr1)
 
     def check_for_none(self):
         # if self.certainly is None or self.maybe is None:
         #     raise ValueError("This shouldn't happen.")
         pass
+
+    def issubset(self, subset: 'Expression', superset: 'Expression'):
+        # handles equal sets and also the case where both are variable identifiers
+        if type(subset) is type(superset) and subset == superset:
+            return True
+        if isinstance(subset, VariableIdentifier) and isinstance(superset, VariableIdentifier):
+            return subset == superset
+        if isinstance(subset, CharSet) and isinstance(superset, CharSet):
+            return subset.issubset(superset)
+        if isinstance(superset, BinarySetOperation):
+            return superset.issuperset(subset)
+        if isinstance(subset, BinarySetOperation):
+            return subset.issubset(superset)
+        return False
 
 class ConditionEvaluator(ExpressionVisitor):
 
@@ -333,6 +364,7 @@ class VariableReplacer(ExpressionVisitor):
     def visit_CharSet(self, expr: 'CharSet', *args, **kwargs):
         return expr
 
+
 class BinarySetOperation(BinaryOperation):
 
     class Operator(BinaryOperation.Operator):
@@ -360,6 +392,25 @@ class BinarySetOperation(BinaryOperation):
         """
         super().__init__(typ, left, operator, right)
 
+    def issuperset(self, other:'Expression'):
+        """
+        Checks if other value is a subset if the current expression
+        :param other:
+        :return:
+        """
+        if (type(other) is type(self.right) and other == self.right) or (type(other) is type(self.left) and other == self.left):
+            return self.operator == BinarySetOperation.Operator.Union
+        return False
+
+    def issubset(self, other: 'Expression'):
+        if (type(other) is type(self.right) and other == self.right) or (type(other) is type(self.left) and other == self.left):
+            return self.operator == BinarySetOperation.Operator.Intersection
+        return False
+"""
+CharSet class
+    Class to represent a set of characters. Inherits Expression so that it can be incorporated in a BinarySetOperation with other expressions.
+===
+"""
 
 class CharSet(Expression):
 

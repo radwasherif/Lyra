@@ -207,7 +207,75 @@
 #                     inputs.add(relation.first.name)
 #                     inputs.add(relation.second.name)
 #         return inputs
+import json
+from json import JSONDecoder
 
-class JSONHandler:
-    def __init__(self):
-        self.handler = "TODO"
+from lyra.abstract_domains.quality.assumption_graph import AssumptionGraph, Mult, AssumptionNode
+from lyra.abstract_domains.quality.type_domain import TypeLattice
+from lyra.core.cfg import Node, Basic
+from lyra.core.types import IntegerLyraType, StringLyraType, FloatLyraType, BooleanLyraType
+from lyra.quality.handler import ResultHandler
+
+
+str_type = {
+                'str': StringLyraType,
+                'float': FloatLyraType,
+                'int': IntegerLyraType,
+                'bool': BooleanLyraType
+
+            }
+
+
+class Decoder(json.JSONDecoder):
+    def __init__(self, numerical_doman, string_domain):
+        self.numerical_domain = numerical_doman
+        self.string_domain = string_domain
+        JSONDecoder.__init__(self, object_hook=self.default)
+
+    def default(self, obj):
+        return self.decode(obj)
+
+    def decode_assumption(self, obj):
+        if "mult" in obj:
+            ag = AssumptionGraph()
+            ag.mult = Mult(val=obj["mult"], typ=IntegerLyraType)
+            ag.assumptions = [self.decode_assumption(a) for a in obj["assumptions"]]
+        if "type" in obj:
+            an = AssumptionNode()
+            an.id = obj["id"]
+            an.type_element = TypeLattice(str_type[obj["type"]])
+            if obj["type"] == "string":
+               an.lattice_element = self.string_domain.parse_from_string(obj["lattice"])
+            else:
+               an.lattice_element = self.numerical_domain.parse_from_string(obj["lattice"])
+            return an
+
+
+class JSONHandler(ResultHandler):
+    def __init__(self, numerical_domain, string_domain):
+        super().__init__()
+        self.numerical_domain = numerical_domain
+        self.string_domain = string_domain
+        self.file_extension = "json"
+
+    def write_result(self):
+        self.result = self.result.get_node_result(Basic(1, None))[0].stack.stack[0]
+        js = self.result.to_json()
+        print("FILENAME", self.filename)
+        with open(self.filename, 'w') as outfile:
+            json.dump(js, outfile, indent=4)
+
+    def read_result(self):
+        ag = AssumptionGraph()
+        js = None
+        with open(self.filename, 'r') as infile:
+            js = json.load(infile, cls=Decoder(self.numerical_domain, self.string_domain))
+
+        print()
+
+
+    def process_result(self):
+        pass
+
+
+

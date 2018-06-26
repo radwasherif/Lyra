@@ -1,0 +1,25 @@
+{
+    "mult": "1",
+    "assumptions": [
+        {
+            "mult": "3",
+            "assumptions": [
+                {
+                    "id": 2,
+                    "type": "string",
+                    "lattice": "T"
+                },
+                {
+                    "id": 3,
+                    "type": "string",
+                    "lattice": "T"
+                },
+                {
+                    "id": 4,
+                    "type": "string",
+                    "lattice": "(C:id2, M:id2)"
+                }
+            ]
+        }
+    ]
+}

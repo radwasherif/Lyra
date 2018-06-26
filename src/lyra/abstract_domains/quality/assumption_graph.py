@@ -3,9 +3,11 @@ from enum import IntEnum
 from typing import Tuple
 
 from lyra.abstract_domains.lattice import Lattice
+from lyra.abstract_domains.numerical.interval_domain import IntervalLattice
+from lyra.abstract_domains.quality.type_domain import TypeLattice
 from lyra.abstract_domains.state import State
 from lyra.core.statements import ProgramPoint
-from lyra.core.types import IntegerLyraType
+from lyra.core.types import IntegerLyraType, StringLyraType, FloatLyraType, BooleanLyraType
 
 from lyra.core.expressions import Expression, Literal, VariableIdentifier, Identifier, UnaryBooleanOperation, \
     BinaryComparisonOperation, Range
@@ -13,11 +15,11 @@ from lyra.core.expressions import Expression, Literal, VariableIdentifier, Ident
 
 class AssumptionNode(Lattice):
 
-    def __init__(self, id: int, lattice_elements: Tuple[Lattice]):
+    def __init__(self, id: int=None, lattice_elements: Tuple[Lattice]=None):
         super().__init__()
         self._id = id
-        self.type_element = lattice_elements[0]
-        self.lattice_element = lattice_elements[1]
+        self.type_element = lattice_elements[0] if lattice_elements is not None else None
+        self.lattice_element = lattice_elements[1] if lattice_elements is not None else None
 
     def __repr__(self):
         return f"(id{self.id}, {self.type_element}, {self.lattice_element})"
@@ -47,7 +49,7 @@ class AssumptionNode(Lattice):
         return self.type_element.is_top() and self.lattice_element.is_top()
 
     def _less_equal(self, other: 'AssumptionNode') -> bool:
-        return self.id > other.id and self.type_element.less_equal(other.type_element) and self.lattice_element.less_equal(other.lattice_element)
+        return self.id >= other.id and self.type_element.less_equal(other.type_element) and self.lattice_element.less_equal(other.lattice_element)
 
     def _join(self, other: 'AssumptionNode') -> 'AssumptionNode':
         # print("Node Join", self, other)
@@ -74,6 +76,19 @@ class AssumptionNode(Lattice):
     def replace_variable(self, variable: Identifier, pp: ProgramPoint):
         self.lattice_element.replace_variable(variable, pp)
 
+    def to_json(self):
+        js = dict()
+        js["id"] = self.id
+        js["type"] = str(self.type_element)
+        js["lattice"] = str(self.lattice_element)
+        return js
+
+    def replace_assumption(self, assumption: 'AssumptionNode'):
+        if self.id == assumption.id:
+            self.type_element = assumption.type_element
+            self.lattice_element = assumption.lattice_element
+
+
 
 class Mult(Literal):
 
@@ -81,12 +96,14 @@ class Mult(Literal):
         super().__init__(*args, **kwargs)
 
     def __add__(self, other):
-        assert isinstance(self.Literal) and self.typ == IntegerLyraType
+        assert isinstance(self, Literal) and self.typ == IntegerLyraType
+        other = int(other.val) if isinstance(other, Mult) else other
         self.val = str(int(self.val) + other)
         return self
 
     def __sub__(self, other):
-        assert isinstance(self.Literal) and self.typ == IntegerLyraType
+        assert isinstance(self, Literal) and self.typ == IntegerLyraType
+        other = int(other.val) if isinstance(other, Mult) else other
         val = str(int(self.val) - other)
         return Mult(self.typ, val)
 
@@ -117,6 +134,7 @@ class AssumptionGraph(Lattice):
         self.condition = None  # condition to be used to calculate multiplicity in case of loops: Expression
         self.is_loop = False  # indicates whether condition is a loop condition or if-statement condition: bool
         self.loss = False # indicates whether information has been lost during a previous join
+        self.ids = []  # a map from program line to assumption
 
     def __repr__(self):
         return self.to_string(self)
@@ -140,12 +158,15 @@ class AssumptionGraph(Lattice):
         return conj
 
     def _less_equal(self, other: 'AssumptionGraph') -> bool:
-        return AssumptionGraph.less_equal_helper(self, other)
+        res, rem = AssumptionGraph.less_equal_helper(self, other)
+        return res, (AssumptionGraph(1, rem[0]), AssumptionGraph(1, rem[1]))
 
     def _join(self, other: 'AssumptionGraph') -> 'AssumptionGraph':
         res, rem = AssumptionGraph.join_helper(self, other)
-        return AssumptionGraph(1, res), rem
-
+        # wrap result and remainder from join algorithm in AssumptionGraph objects
+        res = AssumptionGraph(1, res)
+        rem = (AssumptionGraph(1, rem[0]), AssumptionGraph(1, rem[1]))
+        return res, rem
 
     def _meet(self, other: 'Lattice'):
         raise Exception("This should not happen.")
@@ -170,21 +191,21 @@ class AssumptionGraph(Lattice):
                 # remove loop marker and return longer assumption list
                 # if the not-taken list has lost information, mark result with information loss
                 if len(self.assumptions) > len(other.assumptions):
-                    self.is_loop = False
+                    # self.is_loop = False
                     self.loss = other.loss
-                    return self, ([], [])
+                    return self, (AssumptionGraph(1, []), AssumptionGraph(1, []))
                 else:
-                    other.is_loop = False
+                    # other.is_loop = False
                     other.loss = self.loss
-                    return other, ([], [])
+                    return other, (AssumptionGraph(1, []), AssumptionGraph(1, []))
             else: # the first loop has information loss, take the first loop
-                return self, ([], [])
+                return self, (AssumptionGraph(1, []), AssumptionGraph(1, []))
         # same stack level, but one is not a loop, normal join
-            a = self.copy()
-            b = other.copy()
-            a.is_loop = False
-            b.is_loop = False
-            return a.join(b)
+        a = self.copy()
+        b = other.copy()
+        a.is_loop = False
+        b.is_loop = False
+        return a._join(b)
 
     def join_helper(a_in: 'AssumptionGraph', b_in:'AssumptionGraph'):
         a = a_in.copy()
@@ -223,7 +244,6 @@ class AssumptionGraph(Lattice):
             while len(a.assumptions) > 0 and len(b.assumptions) > 0:
                 a1 = a.assumptions.pop(0)
                 b1 = b.assumptions.pop(0)
-                print(AssumptionGraph.join_helper(a1, b1))
                 res, rem = AssumptionGraph.join_helper(a1, b1)
                 # print(f"ONE {a1} + {b1} -> RES: {res}, REM: {rem}")
                 result = result + res
@@ -270,11 +290,12 @@ class AssumptionGraph(Lattice):
             rem0 = rem[0] + remainder[0]
             rem1 = rem[1] + remainder[1]
             return result, (rem0, rem1)
+
     def easy_join(a, b):
         res_mult = a.mult.min(b.mult)
         res_list = []
         for a1, b1 in zip(a.assumptions, b.assumptions):
-            res_list.append(AssumptionGraph.join(a1, b1)[0])
+            res_list = res_list + AssumptionGraph.join_helper(a1, b1)[0]
         remainder = ([], [])
         if res_mult < a.mult:
             remainder = ([AssumptionGraph(a.mult - res_mult, [AssumptionGraph(1, [assmp.copy() for assmp in a.assumptions])])], [])
@@ -282,6 +303,19 @@ class AssumptionGraph(Lattice):
             remainder = ([], [AssumptionGraph(b.mult - res_mult, [AssumptionGraph(1, [assmp.copy() for assmp in b.assumptions])])])
         result = AssumptionGraph(res_mult, res_list)
         return [result], remainder
+
+    def loop_less_equal(self, other: 'AssumptionGraph'):
+        if not self.loss:  # no information was lost in both loops
+            # remove loop marker and return longer assumption list
+            # if the not-taken list has lost information, mark result with information loss
+            if len(self.assumptions) > len(other.assumptions):
+                # self.is_loop = False
+                return False, (AssumptionGraph(1, []), AssumptionGraph(1, []))
+            else:
+                # other.is_loop = False
+                return True, (AssumptionGraph(1, []), AssumptionGraph(1, []))
+        else:  # the first loop has information loss, take the first loop
+            return False, (AssumptionGraph(1, []), AssumptionGraph(1, []))
 
     def less_equal_helper(a_in: 'AssumptionGraph', b_in: 'AssumptionGraph'):
         a = a_in.copy()
@@ -304,11 +338,11 @@ class AssumptionGraph(Lattice):
         remainder = ([], [])
         if a.is_bottom():
             if not b.is_bottom():
-                return result, ([], [b])
+                return result, ([], [])
             return result, remainder
         if b.is_bottom():
             if not a.is_bottom():
-                return not result, ([a], [])
+                return not result, ([], [])
             return result, remainder
 
         if a.all_nodes() and b.all_nodes() and len(a.assumptions) == len(b.assumptions):
@@ -329,10 +363,10 @@ class AssumptionGraph(Lattice):
                     b.assumptions = rem[1] + b.assumptions
             remainder0 = []
             remainder1 = []
-            if len(a.assumptions) > 0:
-                remainder0 = a.assumptions
-            if len(b.assumptions) > 0:
-                remainder1 = b.assumptions
+            # if len(a.assumptions) > 0:
+            #     remainder0 = a.assumptions
+            # if len(b.assumptions) > 0:
+            #     remainder1 = b.assumptions
             # print((remainder0, remainder1))
             return result, (remainder0, remainder1)
         else:
@@ -353,11 +387,11 @@ class AssumptionGraph(Lattice):
             # print(f"RES -> {res}, REM -> {rem}")
             result = result and res
             # print(f"left {left}, right {right}")
-            if len(rem[0]) > 0:
-                left = AssumptionGraph(1, rem[0] + [left])
-            if len(rem[1]) > 0:
-                # print(f"REM[1]: {rem[1]}, RIGHT: {right}")
-                right = AssumptionGraph(1, rem[1] + [right])
+            # if len(rem[0]) > 0:
+            #     left = AssumptionGraph(1, rem[0] + [left])
+            # if len(rem[1]) > 0:
+            #     # print(f"REM[1]: {rem[1]}, RIGHT: {right}")
+            #     right = AssumptionGraph(1, rem[1] + [right])
                 # print(f"right: {right}, after adding rem {rem[1]}")
             # print("JOIN left right", left, right)
             res, rem = AssumptionGraph.less_equal_helper(left.copy(), right.copy())
@@ -373,10 +407,10 @@ class AssumptionGraph(Lattice):
         for a1, b1 in zip(a.assumptions, b.assumptions):
             result = result and (a1.less_equal(b1))
         remainder = ([], [])
-        if res_mult < a.mult:
-            remainder = ([AssumptionGraph(a.mult - res_mult, [AssumptionGraph(1, [assmp.copy() for assmp in a.assumptions])])], [])
-        elif res_mult < b.mult:
-            remainder = ([], [AssumptionGraph(b.mult - res_mult, [AssumptionGraph(1, [assmp.copy() for assmp in b.assumptions])])])
+        # if res_mult < a.mult:
+        #     remainder = ([AssumptionGraph(a.mult - res_mult, [AssumptionGraph(1, [assmp.copy() for assmp in a.assumptions])])], [])
+        # elif res_mult < b.mult:
+        #     remainder = ([], [AssumptionGraph(b.mult - res_mult, [AssumptionGraph(1, [assmp.copy() for assmp in b.assumptions])])])
         return result, remainder
 
     def copy_helper(self, this: Lattice):
@@ -393,12 +427,14 @@ class AssumptionGraph(Lattice):
             result.assumptions = []
             for element in this.assumptions:
                 result.assumptions.append(self.copy_helper(element))
+            result.ids = deepcopy(this.ids)
         return result
 
     def to_string(self, graph):
         if isinstance(graph, AssumptionNode):
             return repr(graph)
-        return str(graph.mult) + " x [" + ",".join([self.to_string(assmp) for assmp in graph.assumptions]) + "]"
+        return ("L:" if self.is_loop else "") + str(graph.mult) + ("*" if self.loss else "") + " x [" + ",".join([self.to_string(assmp) for assmp in graph.assumptions]) + "]"
+
 
     def traverse(self, graph, func, *args, other=None):
         """
@@ -439,15 +475,22 @@ class AssumptionGraph(Lattice):
         :param lower:
         :return:
         """
-        upper = self
         if lower is None:
-            print("YANHAR ESWEDDD")
-        if upper.loss:
+            return self
+        if len(self.assumptions) == 0:
+            return lower
+        if self.loss:
             lower.loss = True
         if lower.is_loop:
             if not lower.loss:
-                upper.mult = upper.get_mult()
-        lower.add_assumption(upper)
+                self.mult = self.get_mult()
+        # if this is the first iteration -> just put the upper layer in the lower one
+        if not all([a in lower.ids for a in self.ids]):
+            lower.assumptions = [self] + lower.assumptions
+            lower.ids = deepcopy(self.ids)
+        else: # if inputs in the upper layer have been stored before -> replace assumptions one by one from upper layer to lower one
+            for assmp in self.assumptions:
+                lower.add_assumption(assmp)
         return lower
 
     def add_assumption(self, assumption):
@@ -456,7 +499,14 @@ class AssumptionGraph(Lattice):
         :param assumption:
         :return:
         """
-        self.assumptions = [assumption] + self.assumptions
+        if assumption.id in self.ids:
+            self.replace_assumption(assumption)
+        else:
+            self.assumptions = [assumption] + self.assumptions
+            self.ids.append(assumption.id)
+
+    def replace_assumption(self, assumption: 'AssumptionNode'):
+            self.traverse(self, "replace_assumption", assumption)
 
     def get_mult(self):
         condition = self.condition
@@ -466,5 +516,22 @@ class AssumptionGraph(Lattice):
             condition = condition.right
         if isinstance(condition, Range):
             val = int(condition.end.val) - int(condition.start.val)
-            return Literal(IntegerLyraType, str(val))
+            return Mult(IntegerLyraType, str(val))
 
+    def to_json(self):
+        js = dict()
+        js["mult"] = self.mult.val
+        js["assumptions"] = [a.to_json() for a in self.assumptions]
+        return js
+
+    def from_json(self, js: dict):
+        if "mult" in js:
+            ag = AssumptionGraph()
+            ag.mult = Mult(val=js["mult"], typ=IntegerLyraType)
+            ag.assumptions = [self.from_json(a) for a in js["assumptions"]]
+            print(ag)
+            return ag
+        if "type" in js:
+            an = AssumptionNode()
+            an.from_json(js)
+            return an

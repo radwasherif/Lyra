@@ -13,6 +13,8 @@ from lyra.core.types import FloatLyraType, BooleanLyraType, IntegerLyraType, Str
 
 class AssumptionState(State):
 
+    pp_inputs = dict()
+
     def __init__(self, variables: List[VariableIdentifier], numerical_domain, string_domain):
         self.states = {}
         self.types = {
@@ -23,9 +25,14 @@ class AssumptionState(State):
         self.numerical_domain = numerical_domain
         self.string_domain = string_domain
         self.type_state = TypeState(variables)
-        self.states["numerical"] = numerical_domain([v for v in variables if v.typ in self.types["numerical"]])
-        self.states["string"] = string_domain([v for v in variables if v.typ in self.types["string"]])
+        self.numerical_variables = [v for v in variables if v.typ in self.types["numerical"]]
+        self.string_variables = [v for v in variables if v.typ in self.types["string"]]
+        # print("numerical variables", self.numerical_variables)
+        # print("string variables", self.string_variables)
+        self.states["numerical"] = numerical_domain(self.numerical_variables)
+        self.states["string"] = string_domain(self.string_variables)
         self.stack = AssumptionStack(AssumptionGraph)
+        self.stack.assumption_state = self
         self.pp = 0
 
     def copy(self):
@@ -37,9 +44,10 @@ class AssumptionState(State):
             new_state.states[k] = v.copy()
         new_state.stack = self.stack.copy()
         new_state.pp = deepcopy(self.pp)
-        # if self.states['string'] != new_state.states['string']:
-        #     raise ValueError(f"NOT EQUAL\n{self.states['string']}\n{new_state.states['string']}")
-        # assert self.states['string'] == new_state.states['string']
+        # for k, v in self.pp_inputs.items():
+        #     new_state.pp_inputs[k] = v.copy()
+        # print("MY DICT", self.pp_inputs)
+        # print("NEW DICT", new_state.pp_inputs)
         return new_state
 
     def __repr__(self):
@@ -101,8 +109,11 @@ class AssumptionState(State):
         return self
 
     def exit_loop(self) -> 'State':
-        self.stack.top_layer(is_loop=True)
+        # print("BEFORE EXIT", self.stack)
+        self.stack.top_layer(is_loop=False)
         self.stack.pop()
+        # print("AFTER EXIT", self.stack)
+        print()
         return self
 
     def _output(self, output: Expression) -> 'State':
@@ -182,6 +193,7 @@ class AssumptionState(State):
         category = self.get_key(var=variable)
         # get lattice element, this is lost after substitution
         lattice_element = self.states[category].forget_variable(variable)
+        # print("LATTICE ELEMENT", lattice_element)
         # perform substitution for the type
         self.type_state._substitute(variable, right)
         # get type lattice element, this is updated only after substitution
@@ -190,7 +202,9 @@ class AssumptionState(State):
         assumption = AssumptionNode(id=self.pp.line, lattice_elements=(type_element, lattice_element))
         # print("ASSUMPTION", assumption)
         # prepend assumption to top layer of stack
+        # print("STACK BEFORE", self.stack)
         self.stack.top_layer(prepend=assumption)
+        # print("STACK AFTER", self.stack)
         # replace variable in stack with the line number from which it is read
         self.stack.replace_variable(variable, self.pp)
 

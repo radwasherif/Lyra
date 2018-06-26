@@ -11,22 +11,21 @@ class ResultHandler (metaclass=ABCMeta):
         super().__init__()
         self.result = None
         self._filename = None
-        self.file_extension = None   # for example .json for JSON files
+        self._file_extension = None   # for example .json for JSON files
     @property
     def filename(self):
         return self._filename
 
     @filename.setter
     def filename(self, filename: str):
-        self._filename = f"{self.filename}.{self.file_extension}"
+        self._filename = f"{filename}.{self.file_extension}"
 
     @property
     def file_extension(self):
         return self._file_extension
 
     @file_extension.setter
-    @abstractmethod
-    def file_extension(self, file_extension:str):
+    def file_extension(self, file_extension: str):
         self._file_extension = file_extension
 
     @abstractmethod

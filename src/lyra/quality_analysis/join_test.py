@@ -183,4 +183,15 @@ class Mult:
         return self
 m = Mult()
 m = m + 1
-print(m.val)
+# print(m.val)
+
+
+class TestPointer:
+    def __init__(self):
+        self.dct = {"idx": Mult()}
+        self.attrib = self.dct["idx"]
+
+tp = TestPointer()
+tp.dct["idx"] = "Something else"
+
+print(tp.attrib)

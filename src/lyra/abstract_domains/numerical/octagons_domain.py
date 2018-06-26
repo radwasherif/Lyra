@@ -1,28 +1,14 @@
-
-from typing import List
-
-from lyra.abstract_domains.lattice import Lattice
-from lyra.core.expressions import *
-from lyra.abstract_domains.state import State
-from elina.python_interface.elina_auxiliary_imports import *
-from elina.python_interface.opt_oct import *
-# from elina.python_interface.test_imports import *
-from elina.python_interface.elina_scalar import *
-from elina.python_interface.elina_lincons0 import *
-from elina.python_interface.elina_lincons0_h import *
-from elina.python_interface.elina_manager import *
 from elina.python_interface.elina_abstract0 import *
+from elina.python_interface.elina_coeff import *
+from elina.python_interface.elina_dimension import *
+from elina.python_interface.elina_lincons0 import *
 from elina.python_interface.elina_linexpr0 import *
 from elina.python_interface.elina_linexpr0_h import *
-from elina.python_interface.elina_dimension_h import *
-from elina.python_interface.elina_coeff import *
-from elina.python_interface.elina_coeff_h import *
 from elina.python_interface.elina_scalar import *
-from elina.python_interface.elina_scalar_h import *
-from elina.python_interface.elina_dimension import *
-
-import gc
-
+from elina.python_interface.opt_oct import *
+from lyra.abstract_domains.lattice import Lattice
+from lyra.abstract_domains.state import State
+from lyra.core.expressions import *
 from lyra.core.statements import ProgramPoint
 
 

@@ -153,6 +153,16 @@ class IntervalLattice(BottomMixin, ArithmeticMixin):
     def replace_variable(self, variable: Identifier, pp: ProgramPoint):
         pass
 
+    @staticmethod
+    def parse_from_string(repr: str):
+        interval = IntervalLattice()
+        repr = repr[1:-1]
+        repr = repr.split(",")
+        if repr[0] != "-inf":
+            interval.lower = int(repr[0])
+        if repr[1] != "inf":
+            interval.upper = int(repr[1])
+        return repr
 
 class IntervalState(Store, State):
     """Interval analysis state. An element of the interval abstract domain.
@@ -193,6 +203,8 @@ class IntervalState(Store, State):
 
     @copy_docstring(State._assume)
     def _assume(self, condition: Expression) -> 'IntervalState':
+        if not self.belong_here(condition.ids()):
+            return self
         negation_free_normal_expr = NegationFreeNormalExpression()
         converted_condition = negation_free_normal_expr.preprocess(condition)
         normal = negation_free_normal_expr.visit(converted_condition)
@@ -246,6 +258,8 @@ class IntervalState(Store, State):
 
     @copy_docstring(State._substitute)
     def _substitute(self, left: Expression, right: Expression):
+        if not self.belong_here(left.ids().union(right.ids())):
+            return self
         interval_left = deepcopy(self.store[left])
         self.store[left].top()
         if isinstance(left, VariableIdentifier):
@@ -292,6 +306,8 @@ class IntervalState(Store, State):
     def replace_variable(self, variable: Identifier, pp: ProgramPoint):
         pass
 
+    def belong_here(self, vars):
+        return all(var in self.variables for var in vars)
     # expression evaluation
 
     class ExpressionEvaluation(ExpressionVisitor):
