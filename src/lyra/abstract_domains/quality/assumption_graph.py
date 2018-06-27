@@ -1,16 +1,11 @@
 from copy import deepcopy
-from enum import IntEnum
 from typing import Tuple
 
 from lyra.abstract_domains.lattice import Lattice
-from lyra.abstract_domains.numerical.interval_domain import IntervalLattice
-from lyra.abstract_domains.quality.type_domain import TypeLattice
-from lyra.abstract_domains.state import State
-from lyra.core.statements import ProgramPoint
-from lyra.core.types import IntegerLyraType, StringLyraType, FloatLyraType, BooleanLyraType
-
-from lyra.core.expressions import Expression, Literal, VariableIdentifier, Identifier, UnaryBooleanOperation, \
+from lyra.core.expressions import Literal, Identifier, UnaryBooleanOperation, \
     BinaryComparisonOperation, Range
+from lyra.core.statements import ProgramPoint
+from lyra.core.types import IntegerLyraType
 
 
 class AssumptionNode(Lattice):
@@ -60,7 +55,7 @@ class AssumptionNode(Lattice):
            self.lattice_element =  self.lattice_element.join(other.lattice_element)
         self.type_element = self.type_element.join(other.type_element)
         # print("RESULT NODE JOIN", self)
-        print()
+        # print()
         return self
 
     def _meet(self, other: 'AssumptionNode'):
@@ -80,7 +75,7 @@ class AssumptionNode(Lattice):
         js = dict()
         js["id"] = self.id
         js["type"] = str(self.type_element)
-        js["lattice"] = str(self.lattice_element)
+        js["lattice"] = self.lattice_element.to_json()
         return js
 
     def replace_assumption(self, assumption: 'AssumptionNode'):
@@ -88,6 +83,12 @@ class AssumptionNode(Lattice):
             self.type_element = assumption.type_element
             self.lattice_element = assumption.lattice_element
 
+    def check_input(self, line_number, input_value, id_val_map):
+        type_error =  self.type_element.check_input(self.id, line_number, input_value, id_val_map)
+        if type_error is not None:
+            return type_error
+        value_error = self.lattice_element.check_input(self.id, line_number, input_value, id_val_map, self.type_element)
+        return value_error
 
 
 class Mult(Literal):

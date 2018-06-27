@@ -11,8 +11,8 @@ from lyra.quality_analysis.json_handler import JSONHandler
 
 class AssumptionController(Controller):
 
-    def __init__(self, analysis, checker, handler, path):
-        super().__init__(analysis, checker, handler, path)
+    def __init__(self, analysis, checker, handler, path, numerical_domain, string_domain):
+        super().__init__(analysis, checker, handler, path, numerical_domain, string_domain)
         print("Initialized assumption controller.")
 
 
@@ -20,4 +20,4 @@ if __name__ == "__main__":
     name = os.getcwd() + '/example/**.py'
     for path in glob.iglob(name):
         if os.path.basename(path) != "__init__.py":
-            AssumptionController(AssumptionAnalysis(IntervalState, CharacterInclusionState), InputChecker(), JSONHandler(IntervalState, CharacterInclusionState), path).run()
+            AssumptionController(AssumptionAnalysis(), InputChecker(), JSONHandler(), path, IntervalState, CharacterInclusionState).run()

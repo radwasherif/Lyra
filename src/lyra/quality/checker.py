@@ -7,11 +7,14 @@ class Checker(metaclass=ABCMeta):
     def __init__(self):
         super().__init__()
         # full path to input data file
-        self.filename = None
+        self._filename = None
         self.input_filename = None
         self.error_filename = None
         # pointer to controller of the class
-        self.controller = None
+        self._analysis_result = None
+        # dict to store values of every id
+        self.id_assumption = dict()
+
     @property
     def filename(self):
         return self._filename
@@ -23,12 +26,12 @@ class Checker(metaclass=ABCMeta):
         self.error_filename = f"{self.filename}.error.txt"
 
     @property
-    def controller(self):
-        return self._controller
+    def analysis_result(self):
+        return self._analysis_result
 
-    @controller.setter
-    def controller(self, controller):
-        self._controller = controller
+    @analysis_result.setter
+    def analysis_result(self, analysis_result):
+        self._analysis_result = analysis_result
 
     def read_from_file(self):
         """
@@ -40,6 +43,4 @@ class Checker(metaclass=ABCMeta):
     @abstractmethod
     def main(self):
         """Runs the input checker"""
-
-
 

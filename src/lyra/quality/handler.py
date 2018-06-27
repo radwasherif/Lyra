@@ -2,6 +2,8 @@
     Generic class to read/write analysis result from files.
 """
 from abc import ABCMeta, abstractmethod
+
+from lyra.abstract_domains.quality.assumption_graph import AssumptionGraph
 from lyra.engine.interpreter import AnalysisResult
 
 
@@ -33,7 +35,7 @@ class ResultHandler (metaclass=ABCMeta):
         """Write analysis result to file"""
 
     @abstractmethod
-    def read_result(self):
+    def read_result(self) -> 'AssumptionGraph':
         """Read analysis result from file into data structure"""
 
     @abstractmethod

@@ -17,7 +17,18 @@
                 {
                     "id": 4,
                     "type": "string",
-                    "lattice": "(C:id2, M:id2)"
+                    "lattice": {
+                        "certainly": {
+                            "left": "id3",
+                            "operator": 1,
+                            "right": "id2"
+                        },
+                        "maybe": {
+                            "left": "id2",
+                            "operator": 2,
+                            "right": "id3"
+                        }
+                    }
                 }
             ]
         }

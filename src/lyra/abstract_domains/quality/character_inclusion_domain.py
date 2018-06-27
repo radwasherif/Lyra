@@ -11,6 +11,7 @@ from lyra.core.expressions import Identifier, BinaryOperation, Expression, Expre
     Literal, Input, BinaryComparisonOperation, BinaryBooleanOperation, BinaryArithmeticOperation, UnaryBooleanOperation
 from lyra.core.statements import ProgramPoint
 from lyra.core.types import LyraType, StringLyraType
+from lyra.quality_analysis.input_checker import InputError
 
 
 class CharacterInclusionState(Store, State):
@@ -85,6 +86,33 @@ class CharacterInclusionState(Store, State):
             if v is None:
                 raise ValueError("This shouldn't happen.")
             v.check_for_none()
+
+    @staticmethod
+    def from_json(obj):
+        if isinstance(obj, str):
+            if obj[:2] == "id":
+                return VariableIdentifier(StringLyraType, obj)
+            elif obj == "T":
+                ci = CharacterInclusionLattice()
+                ci.top()
+                return ci
+            elif obj == "⊥":
+                ci = CharacterInclusionLattice()
+                ci.bottom()
+                return ci
+        elif "certainly" in obj and "maybe" in obj:
+            ci = CharacterInclusionLattice()
+            ci.certainly = CharacterInclusionState.from_json(obj["certainly"])
+            ci.maybe = CharacterInclusionState.from_json(obj["maybe"])
+            return ci
+        elif "left" in obj and "right" in obj:
+            operator = BinarySetOperation.Operator(obj["operator"])
+            left = CharacterInclusionState.from_json(obj["left"])
+            right = CharacterInclusionState.from_json(obj["right"])
+            return BinarySetOperation(StringLyraType, left, operator, right)
+        elif isinstance(obj, set):
+            cs = CharSet(value=str(obj))
+            return cs
 
 
 class CharacterInclusionLattice(Lattice):
@@ -224,6 +252,65 @@ class CharacterInclusionLattice(Lattice):
         if isinstance(subset, BinarySetOperation):
             return subset.issubset(superset)
         return False
+
+    def to_json(self, obj=None):
+        js = dict()
+        if self.is_top() or self.is_bottom():
+            return str(self)
+        if obj is None:
+            js["certainly"] = self.to_json(self.certainly)
+            js["maybe"] = self.to_json(self.maybe)
+            return js
+        elif isinstance(obj, CharSet):
+            return obj.value
+        elif isinstance(obj, BinarySetOperation):
+            js["left"] = self.to_json(obj.left)
+            js["operator"] = obj.operator.value
+            js["right"] = self.to_json(obj.right)
+            return js
+        else:
+            return str(obj)
+
+    def check_input(self, id, line_number, input_value, id_val_map, typ):
+        certainly = self.evaluate_expression(self.certainly, id_val_map)
+        maybe = self.evaluate_expression(self.maybe, id_val_map)
+        if isinstance(certainly, InputError):
+            return certainly
+        if isinstance(maybe, InputError):
+            return maybe
+        char_set = set(input_value)
+        if not certainly.issubset(char_set):
+            return InputError(code_line=id, input_line=line_number, message=f"Value must contain characters: {certainly}.")
+
+        if not char_set.issubset(maybe):
+            return InputError(code_line=id, input_line=line_number, message=f"Value must not contain characters outside the set: {maybe}.")
+
+
+    def evaluate_expression(self, expr, id_val_map):
+        """
+        Evaluates a set expression to either a set of characters based on previously read inputs, or an InputError if the expression depends on erroneous input. To be used for input checking.
+        :param expr: Expression to be evaluated. Can be of type VariableIdentifier, CharSet or BinarySetOperation
+        :param id_val_map: Values of variables used for evaluation.
+        :return: Either a set of characters to which the expression evaluates, or an InputError object of the expression depends on erroneous input.
+        """
+        if isinstance(expr, VariableIdentifier):
+            expr = expr.name[2:]
+            return set(id_val_map[int(expr)])
+        if isinstance(expr, CharSet):
+            return expr.value
+        if isinstance(expr, BinarySetOperation):
+            left = self.evaluate_expression(expr.left, id_val_map)
+            right = self.evaluate_expression(expr.right, id_val_map)
+            # if one side returns error -> the whole thing returns error
+            if isinstance(left, InputError):
+                return left
+            if isinstance(right, InputError):
+                return right
+            if expr.operator == BinarySetOperation.Operator.Intersection:
+                return left.intersection(right)
+            if expr.operator == BinarySetOperation.Operator.Union:
+                return left.union(right)
+
 
 class ConditionEvaluator(ExpressionVisitor):
 

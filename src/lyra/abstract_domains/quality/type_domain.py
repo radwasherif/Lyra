@@ -8,11 +8,12 @@ from lyra.core.expressions import Expression, VariableIdentifier, Identifier
 from lyra.core.statements import ProgramPoint
 from lyra.core.types import *
 
-
-class TopLyraType(LyraType):
-
-    def __repr__(self):
-        return "T"
+#
+# class TopLyraType(LyraType):
+#
+#     def __repr__(self):
+#         return "T"
+from lyra.quality_analysis.input_checker import InputError
 
 
 class BottomLyraType(LyraType):
@@ -81,12 +82,23 @@ class TypeState(Store, State):
     def replace_variable(self, variable: Identifier, pp: ProgramPoint):
         pass
 
+    @staticmethod
+    def from_json(obj):
+        map = {
+            "string": StringLyraType,
+            "float": FloatLyraType,
+            "int": IntegerLyraType,
+            "bool": BooleanLyraType,
+            "⊥": BottomLyraType
+        }
+        return TypeLattice(type_element=map[obj]())
+
 
 class TypeLattice(Lattice):
 
     def __init__(self, type_element=None):
         super().__init__()
-        self.types = [BottomLyraType(), BooleanLyraType(), IntegerLyraType(), FloatLyraType(), StringLyraType(), TopLyraType()]
+        self.types = [BottomLyraType(), BooleanLyraType(), IntegerLyraType(), FloatLyraType(), StringLyraType()]
         if type_element is not None:
             self.type_element = type_element
         else:
@@ -132,3 +144,33 @@ class TypeLattice(Lattice):
 
     def get_type(self, variable: VariableIdentifier):
         return self.type_element
+
+    def check_input(self, id, line_number, input_value, id_val_map):
+        if isinstance(self.type_element, IntegerLyraType) and not self.is_int(input_value):
+            return InputError(code_line=id, input_line=line_number, message=self.format_error_message(self.type_element))
+        if isinstance(self.type_element, FloatLyraType) and not self.is_bool(input_value):
+            return InputError(code_line=id, input_line=line_number, message=self.format_error_message(self.type_element))
+        if isinstance(self.type_element, BottomLyraType) and not self.is_bool(input_value):
+            return InputError(code_line=id, input_line=line_number, message=self.format_error_message(self.type_element))
+
+    def format_error_message(self, expected_type):
+        return f"Value should be of type {expected_type}"
+
+    def is_int(self, val):
+        try:
+            int(val)
+            return True
+        except:
+            return False
+
+    def is_float(self, val):
+        try:
+            float(val)
+            return True
+        except:
+            return False
+
+    def is_bool(self, val):
+        if val in [True, False, "True", "False", 1, 0, "1", "0"]:
+            return True
+        return False

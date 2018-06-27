@@ -20,6 +20,7 @@ from lyra.core.statements import ProgramPoint
 
 from lyra.core.utils import copy_docstring
 from lyra.core.types import BooleanLyraType, IntegerLyraType, FloatLyraType
+from lyra.quality_analysis.input_checker import InputError
 
 
 class IntervalLattice(BottomMixin, ArithmeticMixin):
@@ -153,16 +154,19 @@ class IntervalLattice(BottomMixin, ArithmeticMixin):
     def replace_variable(self, variable: Identifier, pp: ProgramPoint):
         pass
 
-    @staticmethod
-    def parse_from_string(repr: str):
-        interval = IntervalLattice()
-        repr = repr[1:-1]
-        repr = repr.split(",")
-        if repr[0] != "-inf":
-            interval.lower = int(repr[0])
-        if repr[1] != "inf":
-            interval.upper = int(repr[1])
-        return repr
+    def to_json(self):
+        return str(self)
+
+    def check_input(self, id, line_number, input_value, id_val_map, typ):
+        val = None
+        if isinstance(typ, IntegerLyraType):
+            val = int(input_value)
+        elif isinstance(type, FloatLyraType):
+            val = float(input_value)
+
+        if not (val >= self.lower and val <= self.upper):
+            return InputError(code_line=id, input_line=line_number, message=f"Value should be in range {self}.")
+
 
 class IntervalState(Store, State):
     """Interval analysis state. An element of the interval abstract domain.
@@ -308,6 +312,22 @@ class IntervalState(Store, State):
 
     def belong_here(self, vars):
         return all(var in self.variables for var in vars)
+
+    @staticmethod
+    def from_json(repr: str):
+        interval = IntervalLattice()
+        print(repr)
+        repr = repr[1:-1]
+        print(repr)
+        repr = repr.split(",")
+        print(repr)
+        if repr[0] != "-inf":
+            interval.lower = int(repr[0])
+        if repr[1] != "inf":
+            interval.upper = int(repr[1])
+        return repr
+
+
     # expression evaluation
 
     class ExpressionEvaluation(ExpressionVisitor):

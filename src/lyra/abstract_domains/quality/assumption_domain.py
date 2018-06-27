@@ -2,7 +2,8 @@ from copy import deepcopy
 
 from lyra.abstract_domains.numerical.octagons_domain import OctagonState
 from lyra.abstract_domains.quality.character_inclusion_domain import CharacterInclusionState
-from lyra.abstract_domains.quality.type_domain import TypeState, TopLyraType
+from lyra.abstract_domains.quality.type_domain import TypeState
+from lyra.abstract_domains.quality.type_domain import TypeState
 from lyra.abstract_domains.state import State
 from lyra.core.expressions import *
 from lyra.abstract_domains.quality.assumption_graph import AssumptionGraph, AssumptionNode
@@ -113,7 +114,7 @@ class AssumptionState(State):
         self.stack.top_layer(is_loop=False)
         self.stack.pop()
         # print("AFTER EXIT", self.stack)
-        print()
+        # print()
         return self
 
     def _output(self, output: Expression) -> 'State':
@@ -182,8 +183,6 @@ class AssumptionState(State):
         var_type = typ
         if typ is None:
             var_type = self.type_state.get_type(var)
-            if isinstance(var_type, TopLyraType):
-                var_type = var.typ
         for k, v in self.types.items():
             if var_type in v:
                 return k

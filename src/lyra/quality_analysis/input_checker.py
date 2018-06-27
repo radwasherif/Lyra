@@ -662,7 +662,62 @@
 #             return error_level
 #
 #         return val
+from lyra.abstract_domains.quality.assumption_graph import AssumptionNode
+from lyra.quality.checker import Checker
 
-class InputChecker:
+
+class InputChecker(Checker):
+
     def __init__(self):
-        self.checker = 'C'
+        super().__init__()
+        self.id_val = dict()
+
+    def main(self):
+        print("HENAAAA")
+        # unrolling assumptions
+        unrolled_assumptions = self.unroll_assumptions(self.analysis_result)
+        print(unrolled_assumptions)
+        # read inputs one by one from file and perform checking
+        infile = open(self.input_filename, "r")
+        line_count = 1
+        errors = []
+        for line in infile:
+            line = line.strip()
+            print(line)
+            assumption_node = unrolled_assumptions[line_count-1]
+            error = assumption_node.check_input(line_count, line, self.id_val)
+            if error is None:
+                self.id_val[assumption_node.id] = line
+            else:
+                errors.append(error)
+                self.id_val[assumption_node.id] = error
+            line_count += 1
+        print("ERRORS", errors)
+
+    def unroll_assumptions(self, ag):
+        """
+        Unrolls assumptions from a graph into a list to facilitate input checking against a file
+        :param ag: AssumptionGraph carrying the result of the analysis.
+        :return: A list containing the unrolled assumptions.
+        """
+        if isinstance(ag, AssumptionNode):
+            return [ag]
+        mult = int(ag.mult.val)
+        result = []
+        while mult > 0:
+            mult-=1
+            for assmp in ag.assumptions:
+                result = result + self.unroll_assumptions(assmp)
+
+        return result
+
+
+class InputError:
+    def __init__(self, code_line, input_line, message):
+        self.code_line = code_line
+        self.input_line = input_line
+        self.message = message
+
+    def __repr__(self):
+        return f"Line {self.input_line}: {self.message}"
+

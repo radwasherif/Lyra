@@ -75,7 +75,7 @@ class AssumptionStack(Stack):
 
         self.stack = result.stack
         # print("RESULT", self)
-        print()
+        # print()
         assert len(self.stack) == LEN
         assert not any(el is None for el in self.stack)
 
@@ -106,30 +106,30 @@ class AssumptionStack(Stack):
         a = self.copy()
         b = other.copy()
         result = True
-        print("LESS EQUAL")
-        print("SELF", self)
-        print("OTHER", other)
+        # print("LESS EQUAL")
+        # print("SELF", self)
+        # print("OTHER", other)
         while len(a.stack) > 0 and len(b.stack) > 0:
             # print("iteration")
             # print(a)
             # print(b)
             a_top = a.stack.pop(-1)
             b_top = b.stack.pop(-1)
-            if a_top.is_loop or b_top.is_loop:
-                if len(a.stack) == len(b.stack): # loops are in the same scope
-                    res, rem = a_top.loop_less_equal(b_top)
-                else:
-                    raise Exception("This should not happen.")
-            else:
-                res, rem = a_top._less_equal(b_top)
-            # print(res)
+            # if a_top.is_loop or b_top.is_loop:
+            #     if len(a.stack) == len(b.stack): # loops are in the same scope
+            #         res, rem = a_top.loop_less_equal(b_top)
+            #     else:
+            #         raise Exception("This should not happen.")
+            # else:
+            res, rem = a_top._less_equal(b_top)
+            # print(res, rem)
             result = result and res
             if rem is not None and not rem[0].is_bottom():
                 a.stack.append(rem[0])
             if rem is not None and not rem[1].is_bottom():
                 b.stack.append(rem[1])
-        print("RESULT", result)
-        print()
+        # print("RESULT", result)
+        # print()
         return result
 
     def raise_error(self):
