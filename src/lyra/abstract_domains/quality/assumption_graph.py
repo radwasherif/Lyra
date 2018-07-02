@@ -83,11 +83,11 @@ class AssumptionNode(Lattice):
             self.type_element = assumption.type_element
             self.lattice_element = assumption.lattice_element
 
-    def check_input(self, line_number, input_value, id_val_map):
-        type_error =  self.type_element.check_input(self.id, line_number, input_value, id_val_map)
+    def check_input(self, input_line, start_offset, end_offset, input_value, id_val_map):
+        type_error =  self.type_element.check_input(self.id, input_line, start_offset, end_offset, input_value, id_val_map)
         if type_error is not None:
             return type_error
-        value_error = self.lattice_element.check_input(self.id, line_number, input_value, id_val_map, self.type_element)
+        value_error = self.lattice_element.check_input(self.id, input_line, start_offset, end_offset, input_value, id_val_map, self.type_element.type_element)
         return value_error
 
 

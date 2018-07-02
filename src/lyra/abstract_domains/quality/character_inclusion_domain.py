@@ -271,19 +271,30 @@ class CharacterInclusionLattice(Lattice):
         else:
             return str(obj)
 
-    def check_input(self, id, line_number, input_value, id_val_map, typ):
+    def check_input(self, id, line_number, start_offset, end_offset, input_value, id_val_map, typ):
         certainly = self.evaluate_expression(self.certainly, id_val_map)
         maybe = self.evaluate_expression(self.maybe, id_val_map)
+        # handling depending on erroneous value
         if isinstance(certainly, InputError):
-            return certainly
+            # make a copy of the previous error
+            error = deepcopy(certainly)
+            # change the position in which it will be displayed
+            error.display_line = id
+            error.start_offset = start_offset
+            error.end_offset = end_offset
+            return error
         if isinstance(maybe, InputError):
-            return maybe
+            error = deepcopy(maybe)
+            error.display_line = id
+            error.start_offset = start_offset
+            error.end_offset = end_offset
+            return error
         char_set = set(input_value)
         if not certainly.issubset(char_set):
-            return InputError(code_line=id, input_line=line_number, message=f"Value must contain characters: {certainly}.")
+            return InputError(code_line=id, input_line=line_number, start_offset=start_offset, end_offset=end_offset, message=f"must contain characters: {certainly}.")
 
         if not char_set.issubset(maybe):
-            return InputError(code_line=id, input_line=line_number, message=f"Value must not contain characters outside the set: {maybe}.")
+            return InputError(code_line=id, input_line=line_number, start_offset=start_offset, end_offset=end_offset, message=f"must not contain characters outside the set: {maybe}.")
 
 
     def evaluate_expression(self, expr, id_val_map):

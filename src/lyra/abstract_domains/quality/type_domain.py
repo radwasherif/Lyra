@@ -145,16 +145,16 @@ class TypeLattice(Lattice):
     def get_type(self, variable: VariableIdentifier):
         return self.type_element
 
-    def check_input(self, id, line_number, input_value, id_val_map):
+    def check_input(self, id, line_number, start_offset, end_offset, input_value, id_val_map):
         if isinstance(self.type_element, IntegerLyraType) and not self.is_int(input_value):
-            return InputError(code_line=id, input_line=line_number, message=self.format_error_message(self.type_element))
+            return InputError(code_line=id, input_line=line_number, start_offset=start_offset, end_offset=end_offset, message=self.format_error_message(self.type_element))
         if isinstance(self.type_element, FloatLyraType) and not self.is_bool(input_value):
-            return InputError(code_line=id, input_line=line_number, message=self.format_error_message(self.type_element))
+            return InputError(code_line=id, input_line=line_number, start_offset=start_offset, end_offset=end_offset, message=self.format_error_message(self.type_element))
         if isinstance(self.type_element, BottomLyraType) and not self.is_bool(input_value):
-            return InputError(code_line=id, input_line=line_number, message=self.format_error_message(self.type_element))
+            return InputError(code_line=id, input_line=line_number, start_offset=start_offset, end_offset=end_offset, message=self.format_error_message(self.type_element))
 
     def format_error_message(self, expected_type):
-        return f"Value should be of type {expected_type}"
+        return f"should be of type {expected_type}"
 
     def is_int(self, val):
         try:

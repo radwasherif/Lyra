@@ -25,6 +25,8 @@ def main():
         '--analysis',
         help='analysis to be used (interval, liveness, or usage)',
         default='usage')
+    parser.add_argument('code_modified')
+    parser.add_argument('input_file')
     args = parser.parse_args()
 
     if args.analysis == 'intervals':
@@ -34,8 +36,9 @@ def main():
     if args.analysis == 'usage':
         UsageAnalysis().main(args.python_file)
     if args.analysis == 'assumptions':
-        AssumptionController(AssumptionAnalysis(IntervalState, CharacterInclusionState), InputChecker(), JSONHandler(),
-                             args.python_file).run()
+        print("code modified", args.code_modified, type(args.code_modified))
+        print("input file", args.input_file)
+        AssumptionController(AssumptionAnalysis(), InputChecker(), JSONHandler(), args.python_file, IntervalState, CharacterInclusionState, args.code_modified=="true", args.input_file).run()
 
 
 if __name__ == '__main__':

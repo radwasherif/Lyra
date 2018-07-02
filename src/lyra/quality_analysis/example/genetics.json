@@ -24,9 +24,9 @@
                             "right": "id2"
                         },
                         "maybe": {
-                            "left": "id2",
+                            "left": "id3",
                             "operator": 2,
-                            "right": "id3"
+                            "right": "id2"
                         }
                     }
                 }

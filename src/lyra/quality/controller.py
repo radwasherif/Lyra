@@ -13,18 +13,21 @@ from lyra.quality.handler import ResultHandler
 
 class Controller (metaclass= ABCMeta):
 
-    def __init__(self, analysis_runner: Runner, checker: Checker, result_handler: ResultHandler, canonical_path: str, numerical_domain: 'State', string_domain: 'State', code_modified=True):
+    def __init__(self, analysis_runner: Runner, checker: Checker, result_handler: ResultHandler, canonical_path: str, numerical_domain: 'State', string_domain: 'State', code_modified=True, input_file_path=None):
         super().__init__()
         self.analysis_runner = analysis_runner
         self.result_handler = result_handler
         self.checker = checker
         self.program_path, name = os.path.split(canonical_path)
         self.program_name = name.split(".")[0]
+        self.result_handler.filename = self.filename
         self.analysis_result = None
         self.numerical_domain = numerical_domain
         self.string_domain = string_domain
         self.assign_domains()
         self.code_modified = code_modified
+        print("CODE MODIFIED", self.code_modified)
+        self.input_file_path = input_file_path
 
     @property
     def filename(self):
@@ -36,7 +39,10 @@ class Controller (metaclass= ABCMeta):
 
     def run_checker(self):
         """ Run input checker associated with this controller. """
-        self.checker.filename = self.filename
+        if self.input_file_path is None:
+            self.checker.filename = self.filename
+        else:
+            self.checker.input_filename = self.input_file_path
         self.checker.analysis_result = self.analysis_result
         return self.checker.main()
 
@@ -53,21 +59,14 @@ class Controller (metaclass= ABCMeta):
         """
         return self.result_handler.read_result()
 
-
     def run(self):
         """ Run the controller """
-        if self.code_modified:
+        if self.code_modified or not os.path.isfile(self.result_handler.filename):
             self.analysis_result = self.run_analysis()
-            # print(self.analysis_result)
             self.write_result()
-        try:
-            self.analysis_result = self.read_result()
-            print("result", self.analysis_result)
-            self.run_checker()
-        except:
-            self.code_modified = True
-            # for err in errors:
-            #     print(err)
+
+        self.analysis_result = self.read_result()
+        self.run_checker()
 
     def assign_domains(self):
         self.analysis_runner.numerical_domain = self.numerical_domain

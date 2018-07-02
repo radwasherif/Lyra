@@ -157,7 +157,7 @@ class IntervalLattice(BottomMixin, ArithmeticMixin):
     def to_json(self):
         return str(self)
 
-    def check_input(self, id, line_number, input_value, id_val_map, typ):
+    def check_input(self, id, line_number, start_offset, end_offset, input_value, id_val_map, typ):
         val = None
         if isinstance(typ, IntegerLyraType):
             val = int(input_value)
@@ -165,7 +165,7 @@ class IntervalLattice(BottomMixin, ArithmeticMixin):
             val = float(input_value)
 
         if not (val >= self.lower and val <= self.upper):
-            return InputError(code_line=id, input_line=line_number, message=f"Value should be in range {self}.")
+            return InputError(code_line=id, input_line=line_number, start_offset=start_offset, end_offset=end_offset, message=f"should be in range {self}.")
 
 
 class IntervalState(Store, State):
@@ -321,11 +321,7 @@ class IntervalState(Store, State):
         print(repr)
         repr = repr.split(",")
         print(repr)
-        if repr[0] != "-inf":
-            interval.lower = int(repr[0])
-        if repr[1] != "inf":
-            interval.upper = int(repr[1])
-        return repr
+        return IntervalLattice(int(repr[0]) if repr[0] != '-inf' else -inf, int(repr[1]) if repr[1] != 'inf' else inf)
 
 
     # expression evaluation
