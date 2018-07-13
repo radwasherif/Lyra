@@ -8,133 +8,17 @@ from lyra.core.statements import ProgramPoint
 from lyra.core.types import IntegerLyraType
 
 
-class AssumptionNode(Lattice):
-
-    def __init__(self, id: int=None, lattice_elements: Tuple[Lattice]=None):
-        super().__init__()
-        self._id = id
-        self.type_element = lattice_elements[0] if lattice_elements is not None else None
-        self.lattice_element = lattice_elements[1] if lattice_elements is not None else None
-
-    def __repr__(self):
-        return f"(id{self.id}, {self.type_element}, {self.lattice_element})"
-
-    @property
-    def id(self):
-        return self._id
-
-    @id.setter
-    def id(self, id):
-        self._id = id
-
-    def bottom(self):
-        self.type_element.bottom()
-        self.lattice_element.bottom()
-        return self
-
-    def top(self):
-        self.type_element.top()
-        self.lattice_element.top()
-        return self
-
-    def is_bottom(self) -> bool:
-        return self.type_element.is_bottom() or self.lattice_element.is_bottom()
-
-    def is_top(self) -> bool:
-        return self.type_element.is_top() and self.lattice_element.is_top()
-
-    def _less_equal(self, other: 'AssumptionNode') -> bool:
-        return self.id >= other.id and self.type_element.less_equal(other.type_element) and self.lattice_element.less_equal(other.lattice_element)
-
-    def _join(self, other: 'AssumptionNode') -> 'AssumptionNode':
-        # print("Node Join", self, other)
-        self.id = min(self.id, other.id)
-        if self.type_element != other.type_element:
-            self.lattice_element = self.lattice_element.top()
-        else:
-           self.lattice_element =  self.lattice_element.join(other.lattice_element)
-        self.type_element = self.type_element.join(other.type_element)
-        # print("RESULT NODE JOIN", self)
-        # print()
-        return self
-
-    def _meet(self, other: 'AssumptionNode'):
-        raise Exception("This should not happen.")
-
-    def _widening(self, other: 'AssumptionNode'):
-        self.join(other)
-        return self
-
-    def copy(self):
-        return AssumptionNode(self.id, (self.type_element.copy(), self.lattice_element.copy()))
-
-    def replace_variable(self, variable: Identifier, pp: ProgramPoint):
-        self.lattice_element.replace_variable(variable, pp)
-
-    def to_json(self):
-        js = dict()
-        js["id"] = self.id
-        js["type"] = str(self.type_element)
-        js["lattice"] = self.lattice_element.to_json()
-        return js
-
-    def replace_assumption(self, assumption: 'AssumptionNode'):
-        if self.id == assumption.id:
-            self.type_element = assumption.type_element
-            self.lattice_element = assumption.lattice_element
-
-    def check_input(self, input_line, start_offset, end_offset, input_value, id_val_map):
-        type_error =  self.type_element.check_input(self.id, input_line, start_offset, end_offset, input_value, id_val_map)
-        if type_error is not None:
-            return type_error
-        value_error = self.lattice_element.check_input(self.id, input_line, start_offset, end_offset, input_value, id_val_map, self.type_element.type_element)
-        return value_error
-
-
-class Mult(Literal):
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-    def __add__(self, other):
-        assert isinstance(self, Literal) and self.typ == IntegerLyraType
-        other = int(other.val) if isinstance(other, Mult) else other
-        self.val = str(int(self.val) + other)
-        return self
-
-    def __sub__(self, other):
-        assert isinstance(self, Literal) and self.typ == IntegerLyraType
-        other = int(other.val) if isinstance(other, Mult) else other
-        val = str(int(self.val) - other)
-        return Mult(self.typ, val)
-
-    def min(self, other: 'Mult'):
-        val = str(min(int(self.val), int(other.val)))
-        return Mult(self.typ, val)
-
-    def __lt__(self, other):
-        return int(self.val) < int(other.val)
-
-    def __eq__(self, other):
-        return int(self.val) == other
-
-    def __hash__(self):
-        return super().__eq__()
-
-    def __str__(self):
-        return super().__str__()
-
-
 class AssumptionGraph(Lattice):
     def __init__(self, mult=None, assumptions=None):
         """
 
         """
-        self.mult = Mult(IntegerLyraType, str(mult)) if mult is not None else Mult(IntegerLyraType, "1")# multiplicity parameter: Expression
+        self.mult = Mult(IntegerLyraType, str(mult)) if mult is not None else Mult(IntegerLyraType,
+                                                                                   "1")  # multiplicity parameter: Expression
         self.assumptions = assumptions if assumptions is not None else []  # list of children: Assumption or AssumptionGraph
         self.condition = None  # condition to be used to calculate multiplicity in case of loops: Expression
         self.is_loop = False  # indicates whether condition is a loop condition or if-statement condition: bool
-        self.loss = False # indicates whether information has been lost during a previous join
+        self.loss = False  # indicates whether information has been lost during a previous join
         self.ids = []  # a map from program line to assumption
 
     def __repr__(self):
@@ -188,7 +72,7 @@ class AssumptionGraph(Lattice):
     def loop_join(self, other: 'AssumptionGraph'):
         # both are loops
         if self.is_loop and other.is_loop:
-            if not self.loss: # no information was lost in both loops
+            if not self.loss:  # no information was lost in both loops
                 # remove loop marker and return longer assumption list
                 # if the not-taken list has lost information, mark result with information loss
                 if len(self.assumptions) > len(other.assumptions):
@@ -199,7 +83,7 @@ class AssumptionGraph(Lattice):
                     # other.is_loop = False
                     other.loss = self.loss
                     return other, (AssumptionGraph(1, []), AssumptionGraph(1, []))
-            else: # the first loop has information loss, take the first loop
+            else:  # the first loop has information loss, take the first loop
                 return self, (AssumptionGraph(1, []), AssumptionGraph(1, []))
         # same stack level, but one is not a loop, normal join
         a = self.copy()
@@ -208,7 +92,7 @@ class AssumptionGraph(Lattice):
         b.is_loop = False
         return a._join(b)
 
-    def join_helper(a_in: 'AssumptionGraph', b_in:'AssumptionGraph'):
+    def join_helper(a_in: 'AssumptionGraph', b_in: 'AssumptionGraph'):
         a = a_in.copy()
         b = b_in.copy()
         if isinstance(a, AssumptionNode) and isinstance(b, AssumptionNode):
@@ -299,9 +183,11 @@ class AssumptionGraph(Lattice):
             res_list = res_list + AssumptionGraph.join_helper(a1, b1)[0]
         remainder = ([], [])
         if res_mult < a.mult:
-            remainder = ([AssumptionGraph(a.mult - res_mult, [AssumptionGraph(1, [assmp.copy() for assmp in a.assumptions])])], [])
+            remainder = (
+            [AssumptionGraph(a.mult - res_mult, [AssumptionGraph(1, [assmp.copy() for assmp in a.assumptions])])], [])
         elif res_mult < b.mult:
-            remainder = ([], [AssumptionGraph(b.mult - res_mult, [AssumptionGraph(1, [assmp.copy() for assmp in b.assumptions])])])
+            remainder = (
+            [], [AssumptionGraph(b.mult - res_mult, [AssumptionGraph(1, [assmp.copy() for assmp in b.assumptions])])])
         result = AssumptionGraph(res_mult, res_list)
         return [result], remainder
 
@@ -393,7 +279,7 @@ class AssumptionGraph(Lattice):
             # if len(rem[1]) > 0:
             #     # print(f"REM[1]: {rem[1]}, RIGHT: {right}")
             #     right = AssumptionGraph(1, rem[1] + [right])
-                # print(f"right: {right}, after adding rem {rem[1]}")
+            # print(f"right: {right}, after adding rem {rem[1]}")
             # print("JOIN left right", left, right)
             res, rem = AssumptionGraph.less_equal_helper(left.copy(), right.copy())
             # print(f"MULT2 {left}, {right} -> RES: {res}, REM: {rem}")
@@ -434,8 +320,8 @@ class AssumptionGraph(Lattice):
     def to_string(self, graph):
         if isinstance(graph, AssumptionNode):
             return repr(graph)
-        return ("L:" if self.is_loop else "") + str(graph.mult) + ("*" if self.loss else "") + " x [" + ",".join([self.to_string(assmp) for assmp in graph.assumptions]) + "]"
-
+        return ("L:" if self.is_loop else "") + str(graph.mult) + ("*" if self.loss else "") + " x [" + ",".join(
+            [self.to_string(assmp) for assmp in graph.assumptions]) + "]"
 
     def traverse(self, graph, func, *args, other=None):
         """
@@ -489,14 +375,25 @@ class AssumptionGraph(Lattice):
         if not all([a in lower.ids for a in self.ids]):
             lower.assumptions = [self] + lower.assumptions
             lower.ids = deepcopy(self.ids)
-        else: # if inputs in the upper layer have been stored before -> replace assumptions one by one from upper layer to lower one
-            for assmp in self.assumptions:
-                lower.add_assumption(assmp)
+        else:  # if inputs in the upper layer have been stored before -> replace assumptions one by one from upper layer to lower one
+            lower.replace_all_assumptions(self)
         return lower
 
-    def add_assumption(self, assumption):
+    def replace_all_assumptions(self, other: 'AssumptionGraph'):
         """
-        Prepends new assumption to the front of assumption list
+        Replaces all the assumptions in self with the assumptions existing in 'other'.
+        :param other:
+        :return:
+        """
+        if isinstance(other, AssumptionNode):
+            self.replace_assumption(other)
+            return
+        for assmp in other.assumptions:
+            self.replace_all_assumptions(assmp)
+
+    def add_assumption(self, assumption: 'AssumptionNode'):
+        """
+        Adds a single assumption to an assumption graph if the program point has not had an assumption stored before. Otherwise, it replaces the existing assumption for this program point.
         :param assumption:
         :return:
         """
@@ -507,7 +404,7 @@ class AssumptionGraph(Lattice):
             self.ids.append(assumption.id)
 
     def replace_assumption(self, assumption: 'AssumptionNode'):
-            self.traverse(self, "replace_assumption", assumption)
+        self.traverse(self, "replace_assumption", assumption)
 
     def get_mult(self):
         condition = self.condition
@@ -536,3 +433,131 @@ class AssumptionGraph(Lattice):
             an = AssumptionNode()
             an.from_json(js)
             return an
+
+
+class AssumptionNode(AssumptionGraph):
+
+    def __init__(self, id: int=None, lattice_elements: Tuple[Lattice]=None):
+        super().__init__()
+        self._id = id
+        self.type_element = lattice_elements[0] if lattice_elements is not None else None
+        self.lattice_element = lattice_elements[1] if lattice_elements is not None else None
+
+    def __repr__(self):
+        return f"(id{self.id}, {self.type_element}, {self.lattice_element})"
+
+    @property
+    def id(self):
+        return self._id
+
+    @id.setter
+    def id(self, id):
+        self._id = id
+
+    def bottom(self):
+        self.type_element.bottom()
+        self.lattice_element.bottom()
+        return self
+
+    def top(self):
+        self.type_element.top()
+        self.lattice_element.top()
+        return self
+
+    def is_bottom(self) -> bool:
+        return self.type_element.is_bottom() or self.lattice_element.is_bottom()
+
+    def is_top(self) -> bool:
+        return self.type_element.is_top() and self.lattice_element.is_top()
+
+    def _less_equal(self, other: 'AssumptionNode') -> bool:
+        return self.id >= other.id and self.type_element.less_equal(other.type_element) and self.lattice_element.less_equal(other.lattice_element)
+
+    def _join(self, other: 'AssumptionNode') -> 'AssumptionNode':
+        # print("Node Join", self, other)
+        self.id = min(self.id, other.id)
+        if self.type_element != other.type_element:
+            self.lattice_element = self.lattice_element.top()
+        else:
+           self.lattice_element =  self.lattice_element.join(other.lattice_element)
+        self.type_element = self.type_element.join(other.type_element)
+        # print("RESULT NODE JOIN", self)
+        # print()
+        return self
+
+    def _meet(self, other: 'AssumptionNode'):
+        raise Exception("This should not happen.")
+
+    def _widening(self, other: 'AssumptionNode'):
+        self.join(other)
+        return self
+
+    def copy(self):
+        return AssumptionNode(self.id, (self.type_element.copy(), self.lattice_element.copy()))
+
+    def replace_variable(self, variable: Identifier, pp: ProgramPoint):
+        self.lattice_element.replace_variable(variable, pp)
+
+    def to_json(self):
+        js = dict()
+        js["id"] = self.id
+        js["type"] = str(self.type_element)
+        js["lattice"] = self.lattice_element.to_json()
+        return js
+
+    def replace_assumption(self, assumption: 'AssumptionNode'):
+        if self.id == assumption.id:
+            self.type_element = assumption.type_element
+            self.lattice_element = assumption.lattice_element
+
+    def check_input(self, input_line, start_offset, end_offset, input_value, id_value, id_input_line):
+        type_error = self.type_element.check_input(self.id, input_line, start_offset, end_offset, input_value, id_value)
+        # if there is a type error, ignore other errors and output type error
+        if type_error is not None:
+            return type_error
+        # otherwise, cast the value to its appropriate type and check for value errors
+        types = {
+            'int': int,
+            'float': float,
+            'string': str,
+            'bool': bool
+        }
+        input_value = types[str(self.type_element.type_element)](input_value)
+        value_error = self.lattice_element.check_input(self.id, input_line, start_offset, end_offset, input_value, id_value, id_input_line)
+        return value_error
+
+
+class Mult(Literal):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def __add__(self, other):
+        assert isinstance(self, Literal) and self.typ == IntegerLyraType
+        other = int(other.val) if isinstance(other, Mult) else other
+        self.val = str(int(self.val) + other)
+        return self
+
+    def __sub__(self, other):
+        assert isinstance(self, Literal) and self.typ == IntegerLyraType
+        other = int(other.val) if isinstance(other, Mult) else other
+        val = str(int(self.val) - other)
+        return Mult(self.typ, val)
+
+    def min(self, other: 'Mult'):
+        val = str(min(int(self.val), int(other.val)))
+        return Mult(self.typ, val)
+
+    def __lt__(self, other):
+        return int(self.val) < int(other.val)
+
+    def __eq__(self, other):
+        return int(self.val) == other
+
+    def __hash__(self):
+        return super().__eq__()
+
+    def __str__(self):
+        return super().__str__()
+
+

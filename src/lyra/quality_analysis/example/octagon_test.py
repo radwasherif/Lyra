@@ -6,5 +6,6 @@
 #     raise ValueError
 x: int = int(input())
 a: float = x + 1
-if a < 10 or a > 100:
+n: int = int(input())
+if (a < 10 or a > 100) or (n - 5) < 0:
     raise ValueError

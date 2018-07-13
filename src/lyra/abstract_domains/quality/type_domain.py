@@ -32,6 +32,11 @@ class TypeState(Store, State):
             arguments[typ] = {"type_element": t}
         super().__init__(variables, lattices, arguments)
 
+    def top(self):
+        for v, k in self.store.items():
+            self.store[v] = TypeLattice(v.typ)
+        return self
+
     def _assign(self, left: Expression, right: Expression) -> 'TypeState':
         pass
 
@@ -74,9 +79,9 @@ class TypeState(Store, State):
     def remove_variable(self, variable: VariableIdentifier):
         pass
 
-    def forget_variable(self, variable: VariableIdentifier):
+    def forget_variable(self, variable: VariableIdentifier, pp: int):
         val = self.store[variable].copy()
-        self.store[variable].top()
+        self.store[variable] = TypeLattice(variable.typ)
         return val
 
     def replace_variable(self, variable: Identifier, pp: ProgramPoint):
@@ -148,7 +153,7 @@ class TypeLattice(Lattice):
     def check_input(self, id, line_number, start_offset, end_offset, input_value, id_val_map):
         if isinstance(self.type_element, IntegerLyraType) and not self.is_int(input_value):
             return InputError(code_line=id, input_line=line_number, start_offset=start_offset, end_offset=end_offset, message=self.format_error_message(self.type_element))
-        if isinstance(self.type_element, FloatLyraType) and not self.is_bool(input_value):
+        if isinstance(self.type_element, FloatLyraType) and not self.is_float(input_value):
             return InputError(code_line=id, input_line=line_number, start_offset=start_offset, end_offset=end_offset, message=self.format_error_message(self.type_element))
         if isinstance(self.type_element, BottomLyraType) and not self.is_bool(input_value):
             return InputError(code_line=id, input_line=line_number, start_offset=start_offset, end_offset=end_offset, message=self.format_error_message(self.type_element))

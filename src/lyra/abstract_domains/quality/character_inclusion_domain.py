@@ -1,10 +1,8 @@
-from collections import Set
+import string
 from copy import deepcopy
 from typing import List
 
 from lyra.abstract_domains.lattice import Lattice
-import string
-
 from lyra.abstract_domains.state import State
 from lyra.abstract_domains.store import Store
 from lyra.core.expressions import Identifier, BinaryOperation, Expression, ExpressionVisitor, VariableIdentifier, \
@@ -63,7 +61,7 @@ class CharacterInclusionState(Store, State):
         self.check_for_none()
         return self
 
-    def forget_variable(self, variable: VariableIdentifier) -> 'Lattice':
+    def forget_variable(self, variable: VariableIdentifier, pp: int) -> 'Lattice':
         element = self.store[variable].copy()
         self.store[variable].top()
         return element
@@ -110,8 +108,8 @@ class CharacterInclusionState(Store, State):
             left = CharacterInclusionState.from_json(obj["left"])
             right = CharacterInclusionState.from_json(obj["right"])
             return BinarySetOperation(StringLyraType, left, operator, right)
-        elif isinstance(obj, set):
-            cs = CharSet(value=str(obj))
+        elif isinstance(obj, list):
+            cs = CharSet(value=str(''.join(obj)))
             return cs
 
 
@@ -262,7 +260,7 @@ class CharacterInclusionLattice(Lattice):
             js["maybe"] = self.to_json(self.maybe)
             return js
         elif isinstance(obj, CharSet):
-            return obj.value
+            return list(obj.value)
         elif isinstance(obj, BinarySetOperation):
             js["left"] = self.to_json(obj.left)
             js["operator"] = obj.operator.value
@@ -271,21 +269,21 @@ class CharacterInclusionLattice(Lattice):
         else:
             return str(obj)
 
-    def check_input(self, id, line_number, start_offset, end_offset, input_value, id_val_map, typ):
-        certainly = self.evaluate_expression(self.certainly, id_val_map)
-        maybe = self.evaluate_expression(self.maybe, id_val_map)
+    def check_input(self, id, line_number, start_offset, end_offset, input_value, id_value, id_input_line):
+        certainly = self.evaluate_expression(self.certainly, id_value)
+        maybe = self.evaluate_expression(self.maybe, id_value)
         # handling depending on erroneous value
         if isinstance(certainly, InputError):
             # make a copy of the previous error
             error = deepcopy(certainly)
             # change the position in which it will be displayed
-            error.display_line = id
+            error.display_line = line_number
             error.start_offset = start_offset
             error.end_offset = end_offset
             return error
         if isinstance(maybe, InputError):
             error = deepcopy(maybe)
-            error.display_line = id
+            error.display_line = line_number
             error.start_offset = start_offset
             error.end_offset = end_offset
             return error

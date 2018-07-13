@@ -176,7 +176,8 @@ elina_texpr0_t* elina_texpr0_node(elina_texpr_op_t op, elina_texpr_rtype_t type,
 elina_texpr0_t* elina_texpr0_unop(elina_texpr_op_t op, elina_texpr0_t* opA, elina_texpr_rtype_t type, elina_texpr_rdir_t dir)
 {
   if (!elina_texpr_is_unop(op)){
-    fprintf(stderr,"elina_texpr0.c: elina_texpr0_unop: unary operator expected\n");
+    f
+    printf(stderr,"elina_texpr0.c: elina_texpr0_unop: unary operator expected\n");
     abort();
   }
   return elina_texpr0_node(op,type,dir,opA,NULL);

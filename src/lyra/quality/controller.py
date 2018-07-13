@@ -6,6 +6,8 @@
 """
 import os
 from abc import ABCMeta
+
+from lyra.core.cfg import Basic
 from lyra.engine.runner import Runner
 from lyra.quality.checker import Checker
 from lyra.quality.handler import ResultHandler
@@ -35,7 +37,7 @@ class Controller (metaclass= ABCMeta):
 
     def run_analysis(self):
         """ Calls runner to run the analysis for this controller. """
-        return self.analysis_runner.main(f"{self.filename}.py")
+        return self.analysis_runner.main(f"{self.filename}.py").get_node_result(Basic(1, None))[0].stack.stack[0]
 
     def run_checker(self):
         """ Run input checker associated with this controller. """
@@ -63,10 +65,12 @@ class Controller (metaclass= ABCMeta):
         """ Run the controller """
         if self.code_modified or not os.path.isfile(self.result_handler.filename):
             self.analysis_result = self.run_analysis()
+            print("RESULT", self.analysis_result)
             self.write_result()
 
         self.analysis_result = self.read_result()
-        self.run_checker()
+        print("READ RESULT", self.analysis_result)
+        # self.run_checker()
 
     def assign_domains(self):
         self.analysis_runner.numerical_domain = self.numerical_domain

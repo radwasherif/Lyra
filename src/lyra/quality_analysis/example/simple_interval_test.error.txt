@@ -1,2 +1,0 @@
-|
-0|1|Value on this line should be in range [-inf, 10].

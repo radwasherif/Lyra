@@ -37,7 +37,7 @@ class JSONHandler(ResultHandler):
         self.file_extension = "json"
 
     def write_result(self):
-        self.result = self.result.get_node_result(Basic(1, None))[0].stack.stack[0]
+        # print("RESULT", self.result)
         js = self.result.to_json()
         print("FILENAME", self.filename)
         with open(self.filename, 'w') as outfile:

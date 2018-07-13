@@ -1,3 +1,0 @@
-|
-20|22|Value on this line must not contain characters outside the set: {'a', 'c', 'b'}.
-32|34|Value on this line must contain characters: {'a'}.

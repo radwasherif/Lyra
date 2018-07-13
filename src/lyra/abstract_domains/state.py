@@ -200,7 +200,7 @@ class State(Lattice, metaclass=ABCMeta):
         return deepcopy(self)
 
     @abstractmethod
-    def forget_variable(self, variable: VariableIdentifier) -> 'Lattice':
+    def forget_variable(self, variable: VariableIdentifier, pp: int) -> 'Lattice':
         """Forget all previously gathered information about a variable. """
 
     @abstractmethod

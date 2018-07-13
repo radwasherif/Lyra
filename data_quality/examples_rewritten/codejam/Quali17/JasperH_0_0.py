@@ -3,8 +3,6 @@ t: int = int(input())  # rewritten input into t
 for i in range(1, t + 1):
     s_str: str = input()  # instead of s, k = input().split()
     k_str: str = input()
-    print(s_str)
-    print(k_str)
     k: int = int(k_str)
     # loop instead of list comprehension
     s: List[bool] = [False, False, False]

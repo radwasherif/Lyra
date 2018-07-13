@@ -306,36 +306,44 @@ Print Timing Information
 
 ****/
 
-void opt_oct_fprint(FILE* stream, elina_manager_t* man, opt_oct_t * a,char** name_of_dim){
-	#if defined(TIMING)
-		fprintf(stdout,"Times are in CPU Cycles\n");
-		fprintf(stdout,"Top: %g\n",top_time);
-		fprintf(stdout,"Free: %g\n",free_time);
-		fprintf(stdout,"Copy: %g\n",copy_time);
-		fprintf(stdout,"Closure: %g\n",closure_time);
-		fprintf(stdout,"Is_Equal: %g\n",is_equal_time);
-		fprintf(stdout,"Is_Lequal: %g\n",is_lequal_time);
-		fprintf(stdout,"Meet_Abstract: %g\n",meet_time);
-		fprintf(stdout,"Join: %g\n",join_time);
-		fprintf(stdout,"Widening: %g\n",widening_time);
-		fprintf(stdout,"Add_dimension: %g\n",add_dimension_time);
-		fprintf(stdout,"Permute_dimension: %g\n",permute_dimension_time);
-		fprintf(stdout,"Meet_Lincons_Array: %g\n",meet_lincons_time);
-		fprintf(stdout,"Forget_Array %g\n",forget_array_time);
-		fprintf(stdout,"Oct_to_Box: %g\n",oct_to_box_time);
-		fprintf(stdout,"Alloc: %g\n",alloc_time);
-		fprintf(stdout,"Is_Top: %g\n",is_top_time);
-		fprintf(stdout,"Expand: %g\n",expand_time);
-		fprintf(stdout,"Fold: %g\n",fold_time);
-		fprintf(stdout,"Sat_Lincons: %g\n",sat_lincons_time);
-		fprintf(stdout,"Assign Linexpr: %g\n",assign_linexpr_time);
-        fprintf(stdout,"Narrowing Time: %g\n",narrowing_time);
-		double total_time = top_time + free_time + copy_time + closure_time + is_equal_time + is_lequal_time + meet_time + join_time + widening_time + add_dimension_time
-					+ permute_dimension_time + meet_lincons_time + forget_array_time + oct_to_box_time + alloc_time + is_top_time + expand_time + fold_time + sat_lincons_time + assign_linexpr_time + narrowing_time;
-		fprintf(stdout,"Total Octagon Analysis: %g\n",total_time);
-		fflush(stdout);
-	#endif
+static inline void opt_oct_print_bounds(FILE*stream, opt_oct_internal_t* pr,
+                                    opt_oct_mat_t* oo, size_t dim,
+                                    char** name_of_dim)
+{
+    size_t i,j,ind=0;
+    convert_to_dense_mat(oo, dim, false);
+    double *m = oo->mat;
+    for (i=0;i<2*dim;i++)
+        for (j=0;j<=(i|1);j++,ind++) {
+            elina_lincons0_t l;
+
+            if (i==j || (m[ind]==INFINITY)) continue;
+            l = opt_lincons_of_bound(pr,i,j,m[ind]);
+            elina_lincons0_fprint(stream,&l,name_of_dim);
+            elina_lincons0_clear(&l);
+            fprintf(stream,"\n");
+        }
 }
+
+void opt_oct_fprint(FILE* stream, elina_manager_t* man, opt_oct_t* a, char** name_of_dim)
+{
+    opt_oct_internal_t* pr = opt_oct_init_from_manager(man,ELINA_FUNID_FPRINT,0);
+    if (pr->funopt->algorithm>=0) opt_oct_cache_closure(pr,a);
+    if (!a->closed && !a->m) {
+        fprintf(stream,"empty octagon of dim (%lu,%lu)\n",
+                (unsigned long)a->intdim,(unsigned long)(a->dim-a->intdim));
+    }
+    else {
+        opt_oct_mat_t* m = a->closed ? a->closed : a->m;
+        fprintf(stream,"octagon of dim (%lu,%lu)\n",
+                (unsigned long)a->intdim,(unsigned long)(a->dim-a->intdim));
+        /* if not closed, print the original matrix, not the closed cache */
+        opt_oct_print_bounds(stream,pr,m,a->dim,name_of_dim);
+        //if (pr->conv) flag_conv;
+    }
+}
+
+
 
 
 elina_manager_t* opt_oct_manager_alloc(void)
@@ -356,7 +364,7 @@ elina_manager_t* opt_oct_manager_alloc(void)
   init_array(pr->tmp,pr->tmp_size);
   pr->tmp2 = calloc(pr->tmp_size,sizeof(long));
   assert(pr->tmp2);
-  
+
   man = elina_manager_alloc("opt_oct","1.0 with double", pr,
 			 (void (*)(void*))opt_oct_internal_free);
 
@@ -412,11 +420,11 @@ elina_manager_t* opt_oct_manager_alloc(void)
     man->funptr[ELINA_FUNID_FOLD] = &opt_oct_fold;
     man->funptr[ELINA_FUNID_WIDENING] = &opt_oct_widening;
     man->funptr[ELINA_FUNID_CLOSURE] = &opt_oct_closure;
-    
-	
+
+
   for (i=0;i<ELINA_EXC_SIZE;i++)
     elina_manager_set_abort_if_exception(man,i,false);
-  
+
   return man;
 }
 
@@ -433,4 +441,3 @@ elina_abstract0_t* abstract0_of_opt_oct(elina_manager_t* man, opt_oct_t* oct)
   r->man = elina_manager_copy(man);
   return r;
 }
-

@@ -1,3 +1,16 @@
+"""
+Octagons Abstract Domain
+========================
+
+Relational abstract domain to be used for **octagons analysis**
+TODO
+:Authors: Radwa Sherif Abdelbar and Gagandeep Singh
+"""
+import sys
+from copy import deepcopy
+from ctypes import util
+from typing import List
+
 from elina.python_interface.elina_abstract0 import *
 from elina.python_interface.elina_coeff import *
 from elina.python_interface.elina_dimension import *
@@ -5,266 +18,515 @@ from elina.python_interface.elina_lincons0 import *
 from elina.python_interface.elina_linexpr0 import *
 from elina.python_interface.elina_linexpr0_h import *
 from elina.python_interface.elina_scalar import *
+from elina.python_interface.elina_scalar_h import *
 from elina.python_interface.opt_oct import *
 from lyra.abstract_domains.lattice import Lattice
 from lyra.abstract_domains.state import State
-from lyra.core.expressions import *
+from lyra.core.expressions import Identifier, VariableIdentifier, Expression, ExpressionVisitor, Literal, \
+    UnaryArithmeticOperation, UnaryBooleanOperation, BinaryBooleanOperation, BinaryComparisonOperation, \
+    BinaryArithmeticOperation, NegationFreeNormalExpression
 from lyra.core.statements import ProgramPoint
+from lyra.core.types import IntegerLyraType, FloatLyraType, BooleanLyraType
+from lyra.core.utils import copy_docstring
+
+_elina_manager = opt_oct_manager_alloc()
 
 
-class ElinaLattice(Lattice):
+class OctagonLattice(Lattice):
 
-    def __init__(self, dim: int, idx_to_varname: dict):
-        self.dim = dim
-        self.idx_to_varname = idx_to_varname
-        self.man = opt_oct_manager_alloc()
-        self.abstract = self.top()
-        self.equate()
+    def __init__(self, variable_names: dict, indexes: dict, dimensions: int, elina_abstract = None):
+        super().__init__()
+        self._dimensions = dimensions
+        self._variable_names = variable_names
+        self._indexes = indexes
+        dict_symmetry(variable_names, indexes)
+        self._elina_abstract = None
+        self._elina_linear_constraints = None
+        top = elina_abstract0_top(_elina_manager, 0, dimensions)
+        # setting property sets both the elina abstract element and elina lincons array
+        self.elina_abstract = top if elina_abstract is None else elina_abstract
+
+    @property
+    def dimensions(self):
+        return self._dimensions
+
+    @property
+    def variable_names(self):
+        return self._variable_names
+
+    @property
+    def indexes(self):
+        return self._indexes
+
+    @property
+    def elina_abstract(self):
+        return self._elina_abstract
+
+    @property
+    def elina_linear_constraints(self):
+        return elina_abstract0_to_lincons_array(_elina_manager, self.elina_abstract)
+
+    @elina_abstract.setter
+    def elina_abstract(self, elina_abstract):
+        self._elina_abstract = elina_abstract
+        # self._elina_linear_constraints = elina_abstract0_to_lincons_array(_elina_manager, elina_abstract)
 
     def __repr__(self):
-        return self.to_string()
-
-    def copy(self):
-        copy = ElinaLattice(self.dim, self.idx_to_varname)
-        copy.abstract = elina_abstract0_copy(self.man, self.abstract)
-        copy.equate()
-        return copy
-
-    def top(self):
-        return elina_abstract0_top(self.man, self.dim, 0)
-
-    def bottom(self):
-        return elina_abstract0_bottom(self.man, self.dim, 0)
-
-    def is_top(self):
-        return elina_abstract0_is_top(self.man, self.abstract)
-
-    def is_bottom(self):
-        return elina_abstract0_is_bottom(self.man, self.abstract)
-
-    def _less_equal(self, other: 'ElinaLattice'):
-        return elina_abstract0_is_leq(self.man, self.abstract, other.abstract)
-
-    def _join(self, other: 'ElinaLattice'):
-        # self.print_constraints("self before join")
-        # other.print_constraints("other before join")
-        self.abstract = elina_abstract0_join(self.man, False, self.abstract, other.abstract)
-        self.equate()
-        return self
-        # self.print_constraints("after join")
-
-    def _meet(self, other: 'ElinaLattice'):
-        self.abstract = elina_abstract0_meet(self.man, False, self.abstract, other.abstract)
-        self.equate()
-        return self
-
-    def substitute(self, vi: int, vars: [int], signs: [int], c: int):
-        # print(f"inside substitution {vi, vars, signs, c}")
-        linexpr = self.create_linexpr(vars, signs, c)
-        elina_linexpr0_print(linexpr, None)
-        # print(vi, vj, c)
-        self.abstract = elina_abstract0_substitute_linexpr(self.man, False, self.abstract, ElinaDim(vi), linexpr, None)
-        self.equate()
-        # self.print_constraints("substitute")
-
-    def _widening(self, other):
-        self.abstract = elina_abstract0_widening(self.man, self.abstract, other.abstract)
-        self.equate()
-        # self.print_constraints("widening")
-
-    def replace_variable(self, variable: Identifier, pp: ProgramPoint):
-        for idx, varname in self.idx_to_varname.items():
-            if varname == variable.name:
-                self.idx_to_varname[idx] = f"id{pp.line}"
-
-    # ==================================================
-    #             HEURISTICS
-    # ==================================================
-
-    def create_linexpr(self, var, sign, c):
-        """
-        Return Elina linear expression sign[0]var[0]  sign[1]var[1] +c
-        :param var: list of variables involved in the expression, as indexes
-        :param sign: signs corresponding to every variable
-        :param c: the constant of the expression
-        :return: Elina linear expression
-        """
-        if len(var) != len(sign):
-            raise ValueError("var and sign should have the same length")
-
-        size = len(var)
-        if size > 2:
-            raise ValueError("The size of each constraint of the Octagons domain should be 2 at most")
-        linexpr = elina_linexpr0_alloc(ElinaLinexprDiscr.ELINA_LINEXPR_SPARSE, size)
-        if(c is not None):
-            cst = pointer(linexpr.contents.cst)
-            # set the constant of the expression to c
-            elina_scalar_set_double(cst.contents.val.scalar, float(c))
-            # set the variables and coefficients (signs) of the linear expression
-        for i in range(size):
-            linterm = pointer(linexpr.contents.p.linterm[i])
-            linterm.contents.dim = ElinaDim(var[i])
-            coeff = pointer(linterm.contents.coeff)
-            elina_scalar_set_double(coeff.contents.val.scalar, sign[i])
-
-        return linexpr
-
-    def add_linear_constr(self, var: List[int], sign: List[int], c: int):
-        linexpr = self.create_linexpr(var, sign, c)
-        lincons_array = elina_lincons0_array_make(1)
-        lincons_array.p[0].constyp = ElinaConstyp.ELINA_CONS_SUPEQ
-        lincons_array.p[0].linexpr0 = linexpr
-        top = self.top()
-        self.abstract = elina_abstract0_meet_lincons_array(self.man, False, self.abstract, lincons_array)
-        self.equate()
-
-
-    def add_dim(self, var_name: str):
-        """
-            Adding dimension to Elina abstract to accommodate new variable
-        :param var_name: name of the new variable to be added
-        :return:
-        """
-        # create dimchange array and add the index of the new variable to it
-        dimchange = elina_dimchange_alloc(0, 1)
-        dimchange.dim[0] = self.dim
-        # add the new dimension to Elina
-        self.abstract = elina_abstract0_add_dimensions(self.man, False, self.abstract, dimchange, False)
-        # update dictionary of Elina with the new variable
-        self.idx_to_varname[self.dim] = var_name
-        # update the number of dimensions of Elina
-        self.dim += 1
-        # equate ElinaAbstract with ElinaLinconsArray
-        self.equate()
-
-    def remove_dim(self, dim: int):
-        """
-            Removing dimension from Elina Abstract as a result of variable being removed
-        :param dim: index of dimension to be removed
-        :return:
-        """
-        # create dimchange array with the variable to be removed
-        dimchange = elina_dimchange_alloc(0, 1)
-        dimchange.contents.dim[0] = dim
-        # remove variable from Elina
-        self.abstract = elina_abstract0_remove_dimensions(self.man, False, self.abstract, dimchange)
-        # update dictionary (Elina index -> variable name) accordingly
-        for k,v in self.idx_to_varname.items():
-            # every index that is greater than the removed index is decremented
-            if k > dim:
-                self.idx_to_varname[k-1] = self.idx_to_varname.pop(k)
-        # equate ElinaAbstract with ElinaLinconsArray
-        self.equate()
-
-    def extract_dim(self, dim:int):
-        """
-            Find all constraints in which a certain variable is involved
-        :param dim: dimension whose constraints should be returned
-        :return: new Elina object with constraints related to a certain variable
-        """
-        size = 0
-        # allocate new lincons_array
-        lincons_array = elina_lincons0_array_make(size)
-        new_dict = {}
-        # iterate over all constraints in the lincons_array
-        for i in range(self.lincons_array.size):
-            lincons = self.lincons_array.p[i]
-            for i in range(lincons.linexpr0.contents.size):
-                linterm = lincons.linexpr0.contents.p.linterm[i]
-                cur_dim = linterm.dim
-                # if the current constraint contains the desired dimension
-                if cur_dim == dim:
-                    # increment result array by 1
-                    elina_lincons0_array_resize(lincons_array, size+1)
-                    # add copy of lincons to result array
-                    lincons_array.p[size] = elina_lincons0_copy(lincons)
-                    # increment size
-                    size += 1
-                    # create a new dictionary to be passed to the resulting elina object
-                    for j in range(lincons.linexpr0.contents.size):
-                        l = lincons.linexpr0.contents.p.linterm[j]
-                        new_dict[l.dim] = self.idx_to_varname[l.dim]
-                    break
-        new_elina = ElinaLattice(dim=len(new_dict), idx_to_varname=new_dict)
-        new_elina.lincons_array = lincons_array
-        print(self.idx_to_varname)
-        top = elina_abstract0_top(new_elina.man, self.dim, 0)
-        # This step below gives top
-        elina_lincons0_array_print(lincons_array, None)
-        new_elina.abstract = elina_abstract0_meet_lincons_array(new_elina.man, False, top, lincons_array)
-        # new_elina.print_constraints(f"CONS {dim}")
-        print("NEW ELINA", new_elina)
-        print("IS TOP", new_elina.is_top())
-        return new_elina
-
-
-    def project(self, dim:int):
-        """
-        Performs the project/forget operation of the given dimension
-        :param
-        """
-        self.abstract = elina_abstract0_forget_array(self.man, False, self.abstract, ElinaDim(dim), 1, False)
-        self.equate()
-
-    def equate(self):
-        self.lincons_array = elina_abstract0_to_lincons_array(self.man, self.abstract)
-
-    def print_constraints(self, message: str):
-        print(message)
-        print("constraints")
-        elina_lincons0_array_print(self.lincons_array, None)
-
-    def to_string (self):
-        lincons_array = self.lincons_array
         if self.is_top():
             return "T"
         if self.is_bottom():
             return "⊥"
+        linear_constraints = self.elina_linear_constraints
         result = []
-        for j in range(lincons_array.size):
-            string = ""
-            lincons = lincons_array.p[j]
-            for i in range(lincons.linexpr0.contents.size):
-                linterm = lincons.linexpr0.contents.p.linterm[i]
-                coeff = linterm.coeff
-                string += (" + " if elina_coeff_equal_int(coeff, 1) else " - ")
-                string += (self.idx_to_varname[linterm.dim])
-            if lincons.constyp == ElinaConstyp.ELINA_CONS_SUPEQ:
-                string += " >= "
-            elif lincons.constyp == ElinaConstyp.ELINA_CONS_SUP:
-                string += " > "
-            elif lincons.constyp == ElinaConstyp.ELINA_CONS_EQ:
-                string += " = "
-            string += str(lincons.linexpr0.contents.cst.val.scalar.contents.val.dbl)
-            result.append(string)
+        for j in range(linear_constraints.size):
+            lincons = linear_constraints.p[j]
+            # print(self.lincons_to_string(lincons))
+            result.append(self.lincons_to_string(lincons))
         return f"OCT({','.join(result)})"
 
-    def dim_to_pp(self, dim, pp):
-        self.idx_to_varname[dim] = pp
+    @copy_docstring(Lattice.bottom)
+    def bottom(self):
+        bottom = elina_abstract0_bottom(_elina_manager, 0, self.dimensions)
+        return self.replace(OctagonLattice(self.variable_names, self.indexes, self.dimensions, bottom))
+
+    @copy_docstring(Lattice.top)
+    def top(self):
+        top = elina_abstract0_top(_elina_manager, 0, self.dimensions)
+        return self.replace(OctagonLattice(self.variable_names, self.indexes, self.dimensions, top))
+
+    @copy_docstring(Lattice.is_bottom)
+    def is_bottom(self) -> bool:
+        return elina_abstract0_is_bottom(_elina_manager, self.elina_abstract)
+
+    @copy_docstring(Lattice.is_top)
+    def is_top(self) -> bool:
+        return elina_abstract0_is_top(_elina_manager, self.elina_abstract)
+
+    @copy_docstring(Lattice._less_equal)
+    def _less_equal(self, other: 'OctagonLattice') -> bool:
+        return elina_abstract0_is_leq(_elina_manager, self.elina_abstract, other.elina_abstract)
+
+    @copy_docstring(Lattice._join)
+    def _join(self, other: 'OctagonLattice') -> 'OctagonLattice':
+        elina_abstract = elina_abstract0_join(_elina_manager, False, self.elina_abstract, other.elina_abstract)
+        return self.replace(OctagonLattice(self.variable_names, self.indexes, self.dimensions, elina_abstract))
+
+    @copy_docstring(Lattice._meet)
+    def _meet(self, other: 'OctagonLattice'):
+        elina_abstract = elina_abstract0_meet(_elina_manager, False, self.elina_abstract, other.elina_abstract)
+        return self.replace(OctagonLattice(self.variable_names, self.indexes, self.dimensions, elina_abstract))
+
+    @copy_docstring(Lattice._widening)
+    def _widening(self, other: 'OctagonLattice'):
+        return self._join(other)
+
+    def replace_variable(self, variable: Identifier, pp: ProgramPoint):
+        # input_varname = f"id{pp.line}"
+        # for idx, varname in self.variable_names.items():
+        #     if varname == variable.name:
+        #         self.variable_names[idx] = input_varname
+        #         self.indexes[input_varname] = idx
+        pass
+
+    @copy_docstring(Lattice.copy)
+    def copy(self):
+        abstract = elina_abstract0_copy(_elina_manager, self.elina_abstract)
+        return OctagonLattice(deepcopy(self.variable_names), deepcopy(self.indexes), self.dimensions, abstract)
+
+    def to_json(self):
+        js = dict()
+        js["dimensions"] = self.dimensions
+        js["variable_names"] = self.variable_names
+        js["indexes"] = self.indexes
+        if self.is_bottom():
+            js["lincons_array"] = "⊥"
+        if self.is_top():
+            js["lincons_array"] = "T"
+        js["lincons_array"] = []
+        for i in range(self.elina_linear_constraints.size):
+            lincons = self.elina_linear_constraints.p[i]
+            lincons_json = dict()
+            lincons_json["variables"] = []
+            lincons_json["signs"] = []
+            for j in range(lincons.linexpr0.contents.size):
+                linterm = lincons.linexpr0.contents.p.linterm[j]
+                coeff = linterm.coeff
+                lincons_json["variables"].append(linterm.dim)
+                coeff_val = elina_scalar_sgn(coeff.val.scalar)
+                lincons_json["signs"].append(coeff_val)
+            lincons_json["constraint_type"] = lincons.constyp
+            lincons_json["constant"] = lincons.linexpr0.contents.cst.val.scalar.contents.val.dbl
+            js["lincons_array"].append(lincons_json)
+        return js
+
+    # ================ HELPER FUNCTIONS ====================
+    def project(self, dim: int):
+        """
+        Performs the project/forget operation of the given dimension
+        :param
+        """
+        libc = CDLL(util.find_library('c'))
+        cstdout = c_void_p.in_dll(libc, 'stdout')
+        print("BEFORE PROJECTION", dim)
+        elina_abstract0_fprint(cstdout, _elina_manager, self.elina_abstract, None)
+        abstract = elina_abstract0_forget_array(_elina_manager, False, self.elina_abstract, ElinaDim(dim), 1, False)
+        print("AFTER PROJECTION")
+        elina_abstract0_fprint(cstdout, _elina_manager, abstract, None)
+        return self.replace(OctagonLattice(deepcopy(self.variable_names), deepcopy(self.indexes), self.dimensions, abstract))
+
+    def add_dimension(self, variable_name: str):
+        dimchange = elina_dimchange_alloc(0, 1)
+        dimchange.contents.dim[0] = self.dimensions
+        # add the new dimension to Elina
+        abstract = elina_abstract0_add_dimensions(_elina_manager, False, self.elina_abstract, dimchange, False)
+        # update dictionary of Elina with the new variable
+        variable_names = deepcopy(self.variable_names)
+        indexes = deepcopy(self.indexes)
+        variable_names[self.dimensions] = variable_name
+        indexes[variable_name] = self.dimensions
+        # update the number of dimensions of Elina
+        dimensions = self.dimensions + 1
+        return self.replace(OctagonLattice(variable_names, indexes, dimensions, abstract))
+
+    def handle_input(self, dim:int, pp: int):
+        print("OCTAGON HANDLE INPUT", dim, pp)
+        new_lattice = self.copy()
+        self.project(dim)
+        input_varname = f"id{pp}"
+        if not input_varname in new_lattice.indexes:
+            new_lattice.add_dimension(input_varname)
+
+        dimperm = elina_dimperm_alloc(new_lattice.dimensions)
+        for i in range(new_lattice.dimensions):
+            dimperm.contents.dim[i] = i
+        input_index = new_lattice.indexes[input_varname]
+        dimperm.contents.dim[dim] = input_index
+        dimperm.contents.dim[input_index] = dim
+        abstract = elina_abstract0_permute_dimensions(_elina_manager, False, new_lattice.elina_abstract, dimperm)
+        new_lattice.replace(OctagonLattice(deepcopy(new_lattice.variable_names), deepcopy(new_lattice.indexes), new_lattice.dimensions, abstract))
+        # new_lattice.project(dim)
+        return new_lattice
+
+    def lincons_to_string(self, lincons, id_input_line=None):
+        """
+        Forms a string representation of an Elina linear constraint
+        :param lincons: Linear constraint to be
+        represented.
+        :param id_input_line: optional dictionary to use for mapping indexes to input lines. Default is
+        self.variable_names.
+        :return:
+        """
+        # print("LINEAR CONSTRAINT")
+        # elina_lincons0_print(lincons, None)
+        # print()
+        string = ""
+        for i in range(lincons.linexpr0.contents.size):
+            linterm = lincons.linexpr0.contents.p.linterm[i]
+            coeff = linterm.coeff
+            coeff_val = elina_scalar_sgn(coeff.val.scalar)
+            # print(coeff.val.scalar.contents.discr==ELINA_SCALAR_MPQ)
+            string += (" +" if coeff_val >= 0 else " -")
+            string += " " if i > 0 else ""
+            if coeff_val not in [1, -1]:
+                string += str(coeff_val) + "*"
+            if id_input_line is None:
+                string += (self.variable_names[linterm.dim])
+            else:
+                varname = self.variable_names[linterm.dim]
+                string += f"line {id_input_line[int(varname[2:])]}"
+        const_dbl = lincons.linexpr0.contents.cst.val.scalar.contents.val.dbl
+        if const_dbl >= 0:
+            string += ' + '
+        else:
+            string += ' - '
+        string += str(abs(const_dbl))
+        if lincons.constyp == ElinaConstyp.ELINA_CONS_SUPEQ:
+            string += " >= "
+        elif lincons.constyp == ElinaConstyp.ELINA_CONS_SUP:
+            string += " > "
+        elif lincons.constyp == ElinaConstyp.ELINA_CONS_EQ:
+            string += " = "
+        string += "0"
+        # print("FUNCTION OUTPUT", string)
+        return string
+
+    @staticmethod
+    def create_linear_expression(indexes: List[int], coefficients: List[int], constant: int):
+        if len(indexes) != len(coefficients):
+            raise ValueError("var and sign should have the same length")
+        size = len(indexes)
+        linexpr = elina_linexpr0_alloc(ElinaLinexprDiscr.ELINA_LINEXPR_SPARSE, size)
+        # print(f"LINEXP{indexes}, {coefficients}, {constant}")
+        if constant is not None:
+            cst = pointer(linexpr.contents.cst)
+            # set the constant of the expression to c
+            elina_scalar_set_double(cst.contents.val.scalar, float(constant))
+        # set the variables and coefficients (signs) of the linear expression
+        for i in range(size):
+            linterm = pointer(linexpr.contents.p.linterm[i])
+            linterm.contents.dim = ElinaDim(indexes[i])
+            coeff = pointer(linterm.contents.coeff)
+            elina_scalar_set_double(coeff.contents.val.scalar, float(coefficients[i]))
+        # elina_linexpr0_print(linexpr, None)
+        # print()
+        return linexpr
+
+    def add_linear_constraint(self, indexes: List[int], coefficients: List[int], constant: int, constraint_type: 'BinaryComparisonOperation.Operator'):
+        """
+        Adds a new linear constraint represented by a list of variables and their coefficients. **Important note**:
+        NegationFreeNormalExpression creates constraints of the form 'variables + constant <= 0', while ELINA
+        supports constraints of the form 'variables + constant>= 0'.
+        :param constraint_type:
+        :param indexes:
+        :param coefficients:
+        :param constant:
+        :return:
+        """
+        # assert constraint_type == BinaryComparisonOperation.Operator.LtE, f"Linear constraint was not normalized " \
+        #                                                                   "properly. "
+        # create elina linear expression
+        linexpr = OctagonLattice.create_linear_expression(indexes, coefficients, constant)
+        # print("LINEAR EXPRESSION")
+        # elina_linexpr0_print(linexpr, None)
+        # print()
+        # create elina linear constraint array of size
+        lincons_array = elina_lincons0_array_make(1)
+        # the constraint uses the linear expression with constraint type of '>=' always
+        lincons_array.p[0].constyp = ElinaConstyp.ELINA_CONS_SUPEQ
+        lincons_array.p[0].linexpr0 = linexpr
+        # print("LINEAR CONSTRAINT TO MEET WITH TOP")
+        # elina_lincons0_array_print(lincons_array, None)
+
+        # print(self.lincons_to_string(lincons_array.p[0]))
+        libc = CDLL(util.find_library('c'))
+        cstdout = c_void_p.in_dll(libc, 'stdout')
+        # create lattice element representing the linear constraint
+        top = elina_abstract0_top(_elina_manager, 0, self.dimensions)
+        # print('****')
+        # print("ABSTRACT ELEMENT TOP")
+        # elina_abstract0_fprint(cstdout, _elina_manager, top, None)
+        # print('****')
+        # abstract = elina_abstract0_meet_lincons_array(_elina_manager, False, top, lincons_array)
+        abstract = elina_abstract0_meet_lincons_array(_elina_manager, False, top, lincons_array)
+        # print("****")
+        # print("ABSTRACT ELEMENT AFTER MEET")
+        # elina_abstract0_fprint(cstdout, _elina_manager, abstract, None)
+        # print('****')
+        linear_constraint_element = OctagonLattice(deepcopy(self.variable_names), deepcopy(self.indexes), self.dimensions, abstract)
+        # print("CONSTRAINT LATTICE")
+        # print(linear_constraint_element)
+        # print('------------------------')
+
+        # perform meet between the linear constraint and the already existing constraints
+        return self.meet(linear_constraint_element)
+
+    def substitution(self, subs_variable: str, variables:List[str], coefficients: List[int], constant: int):
+        subs_index = self.indexes[subs_variable]
+        indexes = [self.indexes[var] for var in variables]
+        linexpr = OctagonLattice.create_linear_expression(indexes, coefficients, constant)
+        abstract = elina_abstract0_substitute_linexpr(_elina_manager, False, self.elina_abstract, ElinaDim(subs_index), linexpr, None)
+        return self.replace(OctagonLattice(deepcopy(self.variable_names), deepcopy(self.indexes), self.dimensions, abstract))
+
+
+_normalizer = NegationFreeNormalExpression()  # puts comparison expressions in the form expr <= 0
+
+
+class ConditionEvaluator(ExpressionVisitor):
+    """
+    """
+
+    def visit_Literal(self, expr: 'Literal', *args):
+        if expr.typ == IntegerLyraType() or expr.typ is FloatLyraType() or expr.typ is BooleanLyraType():
+            type_cast = {
+                'int': int,
+                'float': float,
+                'bool': bool
+            }
+            #TODO handle bools
+            return [], [], type_cast[str(expr.typ)](expr.val)
+        raise NotImplementedError(f"Condition evaluator for expression {expr} is not implemented.")
+
+    def visit_Input(self, expr: 'Input', *args):
+        raise NotImplementedError(f"Condition evaluator for expression {expr} is not implemented.")
+
+    def visit_VariableIdentifier(self, expr: 'VariableIdentifier', *args):
+        if expr.typ in [FloatLyraType(), IntegerLyraType(), BooleanLyraType()]:
+            return [expr.name], [1], 0
+        raise NotImplementedError(f"Condition evaluator for expression {expr} is not implemented.")
+
+    def visit_LengthIdentifier(self, expr: 'VariableIdentifier', *args):
+        if expr.typ in [FloatLyraType(), IntegerLyraType(), BooleanLyraType()]:
+            return [expr.name], [1], 0
+        raise NotImplementedError(f"Condition evaluator for expression {expr} is not implemented.")
+
+    def visit_ListDisplay(self, expr: 'ListDisplay'):
+        raise NotImplementedError(f"Condition evaluator for expression {expr} is not implemented.")
+
+
+    def visit_Range(self, expr: 'Range'):
+        raise NotImplementedError(f"Condition evaluator for expression {expr} is not implemented.")
+
+
+    def visit_Split(self, expr: 'Split'):
+        raise NotImplementedError(f"Condition evaluator for expression {expr} is not implemented.")
+
+    def visit_AttributeReference(self, expr: 'AttributeReference'):
+        raise NotImplementedError(f"Condition evaluator for expression {expr} is not implemented.")
+
+    def visit_Subscription(self, expr: 'Subscription'):
+        raise NotImplementedError(f"Condition evaluator for expression {expr} is not implemented.")
+
+    def visit_Slicing(self, expr: 'Slicing'):
+        raise NotImplementedError(f"Condition evaluator for expression {expr} is not implemented.")
+
+
+    def visit_UnaryArithmeticOperation(self, expr: 'UnaryArithmeticOperation'):
+        coeff = 1 if expr.operator == UnaryArithmeticOperation.Operator.Add else -1
+        expr = expr.expression
+        variables, coefficients, constant = self.visit(expr)
+        return variables, list(map(lambda x: coeff * x), coefficients), coeff * constant
+
+    def visit_UnaryBooleanOperation(self, expr: 'UnaryBooleanOperation', lattice_element: 'OctagonLattice'):
+        operator = expr.operator
+        expr = expr.expression
+        if operator == UnaryBooleanOperation.Operator.Neg:
+            if isinstance(expr, BinaryBooleanOperation):
+                left = UnaryBooleanOperation(expr.left.typ, UnaryBooleanOperation.Operator.Neg, expr.left)
+                operator = expr.operator.reverse_operator()
+                right = UnaryBooleanOperation(expr.right, UnaryBooleanOperation.Operator.Neg, expr.right)
+                expr = BinaryBooleanOperation(expr.typ, left, operator, right)
+                return self.visit(expr, lattice_element)
+            elif isinstance(expr, BinaryComparisonOperation):
+                operator = expr.operator.reverse_operator()
+                expr = BinaryComparisonOperation(expr.typ, expr.left, operator, expr.right)
+                return self.visit(expr, lattice_element)
+            elif isinstance(expr, UnaryBooleanOperation):
+                if expr.operator == UnaryBooleanOperation.Operator.Neg:
+                    return self.visit(expr.expression, lattice_element)
+        raise NotImplementedError(f"Condition evaluator for expression {expr} is not implemented.")
+
+    def visit_BinaryArithmeticOperation(self, expr: 'BinaryArithmeticOperation', lattice_element: 'OctagonLattice'):
+        coeff = None
+        variables1, coefficients1, constant1 = self.visit(expr.left, lattice_element)
+        variables2, coefficients2, constant2 = self.visit(expr.right, lattice_element)
+        if expr.operator == BinaryArithmeticOperation.Operator.Add:
+            coeff = 1
+        elif expr.operator == BinaryArithmeticOperation.Operator.Sub:
+            coeff = -1
+
+        if expr.operator in [BinaryArithmeticOperation.Operator.Add, BinaryArithmeticOperation.Operator.Sub]:
+            variables = variables1 + variables2
+            coefficients = coefficients1 + list(map(lambda x: coeff * x, coefficients2))
+            constant = constant1 + coeff * constant2
+            return variables, coefficients, constant
+
+        if expr.operator == BinaryArithmeticOperation.Operator.Mult:
+            if len(variables1) == len(variables2) == 0:
+                return [], [], constant1 * constant2
+            elif len(variables1) > 0 and len(variables2) == 0:
+                return variables1, list(map(lambda x: x * constant2, coefficients1)), constant1 * constant2
+            elif len(variables2) > 0 and len(variables1) == 0:
+                return variables2, list(map(lambda x: x * constant1, coefficients2)), constant1 * constant2
+        # TODO handle y/x --> x != 0
+        if expr.operator == BinaryArithmeticOperation.Operator.Div:
+            if len(variables1) == len(variables2) == 0:
+                if constant2 != 0:
+                    return [], [], constant1 / constant2
+                raise ZeroDivisionError
+            elif len(variables1) > 0 and len(variables2) == 0:
+                if constant2 != 0:
+                    return variables1, list(map(lambda x: x / constant2, coefficients1)), constant1 / constant2
+                raise ZeroDivisionError
+            elif len(variables2) > 0:
+                denominator = BinaryComparisonOperation(expr.left.typ, expr.left, BinaryComparisonOperation.Operator.NotEq, Literal(IntegerLyraType, "0"))
+                self.visit(denominator, lattice_element)
+        raise NotImplementedError(f"Condition evaluator for expression {expr} is not implemented.")
+
+    def visit_BinaryComparisonOperation(self, expr: 'BinaryComparisonOperation', lattice_element: 'OctagonLattice'):
+        normal_expr = _normalizer.visit(expr)  # in the form expr <= 0
+        if expr.operator in [BinaryComparisonOperation.Operator.NotEq, BinaryComparisonOperation.Operator.LtE, BinaryComparisonOperation.Operator.Lt, BinaryComparisonOperation.Operator.Eq, BinaryComparisonOperation.Operator.GtE, BinaryComparisonOperation.Operator.Gt]:
+            if isinstance(normal_expr, BinaryComparisonOperation):
+                variables, coefficients, constant = self.visit(normal_expr.left, lattice_element)
+                indexes = [lattice_element.indexes[var] for var in variables]
+                coefficients = list(map(lambda x: -x, coefficients))
+                constant *= -1
+                return lattice_element.add_linear_constraint(indexes, coefficients, constant, normal_expr.operator)
+            else:
+                copy = lattice_element.copy()
+                self.visit(normal_expr, copy)
+                return copy
+        raise NotImplementedError(f"Condition evaluator for expression {expr} is not implemented.")
+
+    def visit_BinaryBooleanOperation(self, expr: 'BinaryBooleanOperation', lattice_element: 'OctagonLattice'):
+        # modifies element itself
+        lattice_left = lattice_element.copy()
+        lattice_right = lattice_element.copy()
+        self.visit(expr.left, lattice_left)
+        self.visit(expr.right, lattice_right)
+        if expr.operator == BinaryBooleanOperation.Operator.Or:
+            return lattice_element.replace(lattice_left.join(lattice_right))
+        elif expr.operator == BinaryBooleanOperation.Operator.And:
+            return lattice_element.replace(lattice_left.meet(lattice_right))
+        raise NotImplementedError(f"Condition evaluator for expression {expr} is not implemented.")
+
+
+_evaluator = ConditionEvaluator()
 
 
 class OctagonState(State):
 
-
     def __init__(self, variables: List[VariableIdentifier]):
-        self.variables = list(set(variables))
-        self.varname_to_idx, idx_to_varname = self.generate_dict()
-        self.elina = ElinaLattice(dim=len(variables), idx_to_varname=idx_to_varname)
+        super().__init__()
+        self.variables = variables
+        self.variables_names = {i: var.name for i, var in enumerate(self.variables)}
+        self.indexes = {var.name: i for i, var in enumerate(self.variables)}
+        self.lattice_element = OctagonLattice(self.variables_names, self.indexes, len(self.variables))
 
     def __repr__(self):
-        return self.elina.to_string()
+        return repr(self.lattice_element)
+
+    def bottom(self):
+        self.lattice_element.bottom()
+        return self
+
+    def top(self):
+        self.lattice_element.top()
+        return self
+
+    def is_bottom(self) -> bool:
+        return self.lattice_element.is_bottom()
+
+    def is_top(self) -> bool:
+        return self.lattice_element.is_top()
+
+    def _less_equal(self, other: 'OctagonState') -> bool:
+        return self.lattice_element.less_equal(other.lattice_element)
+
+    def _join(self, other: 'OctagonState') -> 'OctagonState':
+        self.lattice_element.join(other.lattice_element)
+        return self
+
+    def _meet(self, other: 'OctagonState'):
+        self.lattice_element.meet(other.lattice_element)
+        return self
+
+    def _widening(self, other: 'OctagonState'):
+        self.lattice_element.widening(other.lattice_element)
+        return self
+
+    def replace_variable(self, variable: Identifier, pp: ProgramPoint):
+        pass
 
     def _assign(self, left: Expression, right: Expression) -> 'State':
-       raise Exception("Assign should not be called in backward analysis.")
+        raise Exception("Assignment should not be called in backward analysis.")
 
-    def _assume(self, condition: Expression) -> 'State':
-        if not self.belong_here(condition.ids()):
-            return self
-        # print("BEFORE assume", condition)
+    def _assume(self, condition: Expression) -> 'OctagonState':
+        try:
+            element = _evaluator.visit(condition, self.lattice_element.copy())
+            self.lattice_element.replace(element)
         # print(self)
-        self._meet(condition)
-        # print("AFTER ASSUME")
-        # print(self)
+        except NotImplementedError:
+            self.top()
         return self
 
     def enter_if(self) -> 'OctagonState':
@@ -286,163 +548,51 @@ class OctagonState(State):
         return self.bottom()
 
     def _substitute(self, left: Expression, right: Expression) -> 'OctagonState':
-        if not self.belong_here(left.ids().union(right.ids())):
-            return self
-        if(isinstance(right, Input)):
-            return self
-        vi, vars, signs, c = self.check_expressions(left, right)
-        self.elina.substitute(vi, vars, signs, c)
+        # try:
+        variables, coefficients, constant = _evaluator.visit(right, self.lattice_element.copy().top())
+        self.lattice_element.substitution(left.name, variables, coefficients, constant)
         return self
+        # except NotImplementedError:
+        #     self.lattice_element.project(self.indexes[left.name])
+        #     return self
 
-    def bottom(self):
-        self.elina.abstract = self.elina.bottom()
-        self.elina.equate()
-        return self
+    def forget_variable(self, variable: VariableIdentifier, pp: int) -> 'OctagonLattice':
+        dim = self.indexes[variable.name]
+        print("IN FORGET", variable, dim)
+        element = self.lattice_element.handle_input(dim, pp)
+        # print("ELEMENT", element)
+        return element
 
-    def top(self):
-        self.elina.abstract = self.elina.top()
-        self.elina.equate()
-        return self
+    def add_variable(self, variable: VariableIdentifier):
+        pass
 
-    def is_bottom(self) -> bool:
-        return self.elina.is_bottom()
-
-    def is_top(self) -> bool:
-        return self.elina.is_top()
-
-    def _less_equal(self, other: 'OctagonState') -> bool:
-        return self.elina.less_equal(other.elina)
-
-    def _join(self, other: 'OctagonState') -> 'OctagonState':
-        self.elina.join(other.elina)
-        return self
-
-    def _meet(self, other: 'OctagonState'):
-        # We have VARS*SIGNS + C <= 0
-        var, sign, c = self.check_condition(other)
-        # Convert to Elina format -VARS*SIGNS >= C
-        sign = list(map(lambda x: -x, sign))
-        self.elina.add_linear_constr(var, sign, c)
-        return self
-
-    def _widening(self, other: 'OctagonState'):
-        self.elina.widening(other.elina)
-        return self
+    def remove_variable(self, variable: VariableIdentifier):
+        pass
 
     def copy(self):
         copy = OctagonState(self.variables)
-        copy.elina = self.elina.copy()
+        copy.variables_names = deepcopy(self.variables_names)
+        copy.indexes = deepcopy(self.indexes)
+        copy.lattice_element = self.lattice_element.copy()
         return copy
 
-    def add_variable(self, variable: VariableIdentifier):
-        # add variable to elina
-        self.elina.add_dim(variable.name)
-        # add to variables list of octagon
-        self.variables.add(variable)
-        # update dictionary {idx -> varname}
-        self.varname_to_idx[variable.name] = len(self.variables) - 1
-
-    def forget_variable(self, variable: VariableIdentifier):
-        dim = self.varname_to_idx[variable.name]
-        print("IN FORGET", variable, dim)
-        element = self.elina.extract_dim(dim)
-        print("ELEMENT", element)
-        self.elina.project(dim)
-        return element
-
-    def remove_variable(self, variable: VariableIdentifier):
-        dim = self.varname_to_idx[variable.name]
-        self.elina.remove_dim(dim)
-        for k,v in self.varname_to_idx.items():
-            if v > dim and k != variable.name:
-                self.varname_to_idx[dim] -= 1
-        del self.varname_to_idx[variable.name]
-
-    def replace_variable(self, variable: Identifier, pp: ProgramPoint):
-        pass
-
-    def belong_here(self, vars):
-        return all(var in self.variables for var in vars)
-    # ==================================================
-    #             HEURISTICS
-    # ==================================================
-    def generate_dict(self):
-        """
-        :return: dictionary in which every Lyra variable is mapped to an integer index to be passed to Elina
-        """
-        return {var.name: i for i, var in enumerate(self.variables)}, {i: var.name for i, var in enumerate(self.variables)}
-
-    def check_expressions(self, left: Expression, right: Expression):
-        """
-            Checks if left and right expressions make a valid substitution.
-        :param left:
-        :param right:
-        :return:vi: variable to substitute
-
-        """
-        # print(f"left {left}, right {right}")
-        vi, vj, c, = None, None, None
-        var_ids, signs, c = self.normalize_arithmetic(right)
-        if isinstance(left, VariableIdentifier):
-            vi = self.varname_to_idx[left.name]
-            if len(var_ids) > 1:
-                raise ValueError(f"For now we only support substitution with at most one variable, {right} doesn't work")
-            vars = [self.varname_to_idx[id.name] for id in var_ids]
-        return vi, vars, signs, c
+    @staticmethod
+    def from_json(js):
+        variable_names = dict()
+        variable_names = dict()
+        for k, v in js["variable_names"].items():
+            variable_names[int(k)] = v
+        lattice_element = OctagonLattice(variable_names, js["indexes"], js["dimensions"])
+        if js["lincons_array"] == "T":
+            return lattice_element.top()
+        if js["lincons_array"] == "⊥":
+            return lattice_element.bottom()
+        # print("FROM JSON")
+        for lincons in js["lincons_array"]:
+            lattice_element.add_linear_constraint(lincons["variables"], lincons["signs"], int(lincons["constant"]), BinaryComparisonOperation.Operator.LtE)
+        return lattice_element
 
 
-    def check_condition(self, condition: Expression):
-        '''
-        So far only checking for expression of the form x + y [comparison operator] c
-        :param condition: condition to be checked
-        :return:
-        '''
-        # print(f"Checking condition  condition}")
-        negation_free_normal = NegationFreeNormalExpression()
-        normal_condition = negation_free_normal.visit(condition)
-        vars, signs = [], []
-        expr = normal_condition.left # x + y - c
-        var_ids, signs, c = self.normalize_arithmetic(expr)
-        vars = [self.varname_to_idx[id.name] for id in var_ids]
-        return vars, signs, c
-
-    def normalize_arithmetic(self, expr: Expression):
-        """
-
-        :param expr: Linear expression with coefficients of -1 or 1 and any number of constant terms
-        :return: new expression of the form ((+/-v1) + (+/-v2) + (+/-v3) + ... ) + C, where C = sum of all constants in expr
-        """
-        vars, signs = self.flatten_expr(expr, 1)
-        constant = 0
-        idx_to_del = []
-        #calculate the total sum of all constants (Literals)
-        for i, v in enumerate(vars):
-            if(isinstance(v, Literal)):
-                constant += (signs[i] * (float(v.val)))
-                idx_to_del.append(i)
-
-        #remove Literals from array so that only variables remain
-        for i in sorted(idx_to_del, reverse=True):
-            del vars[i]
-            del signs[i]
-        #
-        # if len(vars) > 2:
-        #     raise ValueError("Expression should have only 2 variables")
-        return vars, signs, constant
-
-    def flatten_expr(self, expr: Expression, sign: int):
-        """
-
-        :param expr: Expression to be flattened
-        :param sign: Keeping track of the sign of the current expression
-        :return: array of VariableIdentifier and Literal, array of signs that correspond to each VariableIdentifier/Literal, 1 for positive, -1 for negative
-        """
-        if isinstance(expr, VariableIdentifier) or isinstance(expr, Literal):
-            return [expr], [sign]
-        if isinstance(expr, BinaryArithmeticOperation):
-            expr_right, sign_right = self.flatten_expr(expr.left, sign)
-            expr_left, sign_left = self.flatten_expr(expr.right,
-                                                sign if expr.operator == BinaryArithmeticOperation.Operator.Add else -sign)
-            return expr_right + expr_left, sign_right + sign_left
-        if isinstance(expr, UnaryArithmeticOperation):
-            return self.flatten_expr(expr.expression, sign if expr.operator == UnaryArithmeticOperation.Operator.Add else -sign)
+def dict_symmetry(a: dict, b:dict):
+    for k, v in a.items():
+        assert k == b[v] and v == a[k], f"{a},{b}"

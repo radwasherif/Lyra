@@ -1,3 +1,5 @@
+from copy import deepcopy
+
 from lyra.abstract_domains.quality.assumption_graph import AssumptionNode
 from lyra.quality.checker import Checker
 
@@ -6,32 +8,38 @@ class InputChecker(Checker):
 
     def __init__(self):
         super().__init__()
-        self.id_val = dict()
 
     def perform_checking(self):
         # unrolling assumptions
         unrolled_assumptions = self.unroll_assumptions(self.analysis_result)
         # read inputs one by one from file and perform checking
         infile = open(self.input_filename, "r")
-        line_count = 1
-        errors = []
+        line_number = 1
         start_offset = 0
         end_offset = 0
+        # list of errors
+        errors = []
+        id_value = dict()  # maps every program point to the last input value read from it
+        id_input_line = dict()  # maps every program point to the last line number from which its input has been read
         for input_value in infile:
             input_value = input_value.strip()
             end_offset = start_offset + len(input_value) - 1
-            if line_count-1 >= len(unrolled_assumptions):
+            if line_number-1 >= len(unrolled_assumptions):
                 break
-            assumption_node = unrolled_assumptions[line_count - 1]
-            error = assumption_node.check_input(line_count, start_offset, end_offset, input_value, self.id_val)
-            if error is None:
-                self.id_val[assumption_node.id] = input_value
-            else:
+            assumption_node = unrolled_assumptions[line_number - 1]
+            id_value[assumption_node.id] = input_value
+            old_id_input_line = deepcopy(id_input_line)
+            id_input_line[assumption_node.id] = line_number
+
+            error = assumption_node.check_input(line_number, start_offset, end_offset, input_value, id_value, id_input_line)
+            # if there is an error
+            if error is not None:
                 errors.append(error)
-                self.id_val[assumption_node.id] = error
-            line_count += 1
+                id_value[assumption_node.id] = error
+                id_input_line = old_id_input_line
+            line_number += 1
             print(input_value, start_offset, end_offset)
-            start_offset = end_offset + 2
+            start_offset = end_offset + 3
         return errors
 
     def write_errors(self):
@@ -73,7 +81,7 @@ class InputError:
         self.message = message
 
     def __repr__(self):
-        return f"{self.start_offset}{InputError.separator}{self.end_offset}{InputError.separator}{self.get_message()}"
+        return f"{self.display_line}{InputError.separator}{self.start_offset}{InputError.separator}{self.end_offset}{InputError.separator}{self.get_message()}"
 
     def get_message(self):
         if self.input_line == self.display_line:

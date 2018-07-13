@@ -17,14 +17,15 @@ class AssumptionAnalysis(Runner):
 
     @property
     def variables(self) -> List[Identifier]:
-        all_vars = super().variables
-        for var in all_vars:
-            if isinstance(var.typ, ListLyraType):
+        variables_list = super().variables
+        variables = set(variables_list)
+        for var in variables_list:
+            if isinstance(var.typ, ListLyraType) or isinstance(var.typ, StringLyraType):
                 length_var = LengthIdentifier(var)
-                if length_var in all_vars:
+                if length_var in variables:
                     continue
-                all_vars.append(length_var)
-        return all_vars
+                variables.add(length_var)
+        return sorted(variables, key=lambda x: x.name)
 
     def interpreter(self):
         return BackwardInterpreter(self.cfg, DefaultBackwardSemantics(), 3)

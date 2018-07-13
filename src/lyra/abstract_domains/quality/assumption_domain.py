@@ -1,13 +1,10 @@
 from copy import deepcopy
 
-from lyra.abstract_domains.numerical.octagons_domain import OctagonState
-from lyra.abstract_domains.quality.character_inclusion_domain import CharacterInclusionState
-from lyra.abstract_domains.quality.type_domain import TypeState
+from lyra.abstract_domains.quality.assumption_graph import AssumptionGraph, AssumptionNode
+from lyra.abstract_domains.quality.assumption_stack import AssumptionStack
 from lyra.abstract_domains.quality.type_domain import TypeState
 from lyra.abstract_domains.state import State
 from lyra.core.expressions import *
-from lyra.abstract_domains.quality.assumption_graph import AssumptionGraph, AssumptionNode
-from lyra.abstract_domains.quality.assumption_stack import AssumptionStack
 from lyra.core.statements import ProgramPoint
 from lyra.core.types import FloatLyraType, BooleanLyraType, IntegerLyraType, StringLyraType
 
@@ -28,8 +25,6 @@ class AssumptionState(State):
         self.type_state = TypeState(variables)
         self.numerical_variables = [v for v in variables if v.typ in self.types["numerical"]]
         self.string_variables = [v for v in variables if v.typ in self.types["string"]]
-        # print("numerical variables", self.numerical_variables)
-        # print("string variables", self.string_variables)
         self.states["numerical"] = numerical_domain(self.numerical_variables)
         self.states["string"] = string_domain(self.string_variables)
         self.stack = AssumptionStack(AssumptionGraph)
@@ -131,11 +126,12 @@ class AssumptionState(State):
             self.handle_input(left, right)
         else:
             self.propagate_down("_substitute", left, right)
+
         new_type = self.type_state.get_type(left)
         self.type_change(variable=left, new_type=new_type, old_type=old_type)
         return self
 
-    def forget_variable(self, variable: VariableIdentifier):
+    def forget_variable(self, variable: VariableIdentifier, pp: int):
         pass
 
     def add_variable(self, variable: VariableIdentifier):
@@ -191,12 +187,12 @@ class AssumptionState(State):
         # print("INPUT", variable)
         category = self.get_key(var=variable)
         # get lattice element, this is lost after substitution
-        lattice_element = self.states[category].forget_variable(variable)
+        lattice_element = self.states[category].forget_variable(variable, self.pp.line)
         # print("LATTICE ELEMENT", lattice_element)
         # perform substitution for the type
         self.type_state._substitute(variable, right)
         # get type lattice element, this is updated only after substitution
-        type_element = self.type_state.forget_variable(variable)
+        type_element = self.type_state.forget_variable(variable, self.pp.line)
         # associate assumption with line number
         assumption = AssumptionNode(id=self.pp.line, lattice_elements=(type_element, lattice_element))
         # print("ASSUMPTION", assumption)

@@ -157,14 +157,8 @@ class IntervalLattice(BottomMixin, ArithmeticMixin):
     def to_json(self):
         return str(self)
 
-    def check_input(self, id, line_number, start_offset, end_offset, input_value, id_val_map, typ):
-        val = None
-        if isinstance(typ, IntegerLyraType):
-            val = int(input_value)
-        elif isinstance(type, FloatLyraType):
-            val = float(input_value)
-
-        if not (val >= self.lower and val <= self.upper):
+    def check_input(self, id, line_number, start_offset, end_offset, input_value, id_value, id_input_line):
+        if not (self.lower <= input_value <= self.upper):
             return InputError(code_line=id, input_line=line_number, start_offset=start_offset, end_offset=end_offset, message=f"should be in range {self}.")
 
 
@@ -296,7 +290,7 @@ class IntervalState(Store, State):
                 return self
         raise NotImplementedError(f"Substitution for {left} = {right} is not yet implemented!")
 
-    def forget_variable(self, variable: VariableIdentifier):
+    def forget_variable(self, variable: VariableIdentifier, pp: int):
         val = self.store[variable].copy()
         self.store[variable].top()
         return val

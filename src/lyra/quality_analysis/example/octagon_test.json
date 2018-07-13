@@ -1,0 +1,121 @@
+{
+    "mult": "1",
+    "assumptions": [
+        {
+            "id": 7,
+            "type": "int",
+            "lattice": {
+                "dimensions": 4,
+                "variable_names": {
+                    "0": "a",
+                    "1": "n",
+                    "2": "x",
+                    "3": "id7"
+                },
+                "indexes": {
+                    "a": 0,
+                    "n": 1,
+                    "x": 2,
+                    "id7": 3
+                },
+                "lincons_array": [
+                    {
+                        "variables": [
+                            3
+                        ],
+                        "signs": [
+                            1
+                        ],
+                        "constraint_type": 1,
+                        "constant": -9.0
+                    },
+                    {
+                        "variables": [
+                            3
+                        ],
+                        "signs": [
+                            -1
+                        ],
+                        "constraint_type": 1,
+                        "constant": 99.0
+                    }
+                ]
+            }
+        },
+        {
+            "id": 9,
+            "type": "int",
+            "lattice": {
+                "dimensions": 4,
+                "variable_names": {
+                    "0": "a",
+                    "1": "n",
+                    "2": "x",
+                    "3": "id9"
+                },
+                "indexes": {
+                    "a": 0,
+                    "n": 1,
+                    "x": 2,
+                    "id9": 3
+                },
+                "lincons_array": [
+                    {
+                        "variables": [
+                            0
+                        ],
+                        "signs": [
+                            1
+                        ],
+                        "constraint_type": 1,
+                        "constant": -10.0
+                    },
+                    {
+                        "variables": [
+                            0
+                        ],
+                        "signs": [
+                            -1
+                        ],
+                        "constraint_type": 1,
+                        "constant": 100.0
+                    },
+                    {
+                        "variables": [
+                            0,
+                            3
+                        ],
+                        "signs": [
+                            -1,
+                            1
+                        ],
+                        "constraint_type": 1,
+                        "constant": 95.0
+                    },
+                    {
+                        "variables": [
+                            0,
+                            3
+                        ],
+                        "signs": [
+                            1,
+                            1
+                        ],
+                        "constraint_type": 1,
+                        "constant": -15.0
+                    },
+                    {
+                        "variables": [
+                            3
+                        ],
+                        "signs": [
+                            1
+                        ],
+                        "constraint_type": 1,
+                        "constant": -5.0
+                    }
+                ]
+            }
+        }
+    ]
+}
