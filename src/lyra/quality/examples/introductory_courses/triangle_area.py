@@ -11,8 +11,8 @@ if A < B + C: # first if
             print(" This is a triangle with the Area: ")
             print(Area)
         else: #else of 3rd if
-            print("This cannot be a triangle!")
+            raise ValueError("Not a triangle")
     else: #else of 2nd if
-        print("This cannot be a triangle!")
+        raise ValueError("Not a triangle")
 else: #else of 1st if
-    print("This cannot be a triangle!")
+    raise ValueError("Not a triangle")

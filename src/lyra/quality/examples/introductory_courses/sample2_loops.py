@@ -1,20 +1,20 @@
 for x in range(10):
-     if x > 7:
+    if x > 7:
         x += 2
-        continue
-     x = x + 1
-     print("Still in the loop.")
-     if x == 8:
-        break
+    else:
+        x = x + 1
+        print("Still in the loop.")
+        if x == 8:
+            break
 print ("Outside of the loop.")
 
 x = 3
 while x < 10:
     if x > 7:
         x += 2
-        continue
-    x = x + 1
-    print("Still in the loop.")
-    if x == 8:
-        break
+    else:
+        x = x + 1
+        print("Still in the loop.")
+        if x == 8:
+            break
 print ("Outside of the loop.")

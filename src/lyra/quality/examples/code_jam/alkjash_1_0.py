@@ -8,6 +8,7 @@ for tt in range(3):
         info: List[int] = [0, 0, 0]
         info[0]: int = int(input())
         info[1]: int = int(input())
+        # len(info) > 3
         info[2]: int = int(input())
         for x in info:
             if x not in times:
