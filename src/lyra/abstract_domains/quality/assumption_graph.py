@@ -123,6 +123,8 @@ class AssumptionGraph(Lattice):
         if a.all_nodes() and b.all_nodes() and len(a.assumptions) == len(b.assumptions):
             return AssumptionGraph.easy_join(a, b)
 
+        # 1 * [A1, A2,.. ] (join) 1 * [B1, B2, B3,..] = 1 * [A1 (join) B1, A2 (join) B2],
+        # with remainder = ([], [B3])
         if a.mult == 1 and b.mult == 1:
             if b.assumptions is None:
                 raise ValueError
@@ -145,7 +147,8 @@ class AssumptionGraph(Lattice):
             # print((remainder0, remainder1))
             return result, (remainder0, remainder1)
         else:
-            # print("JOIN n m 1 1")
+            # N * [A1, A2,...An] (join) M * [B1, B2,...,Bm] where at least N or M is not 1
+            # unroll one iteration of the loop
             if a.mult == 1:
                 left = AssumptionGraph(1, [])
             else:
@@ -155,28 +158,32 @@ class AssumptionGraph(Lattice):
             else:
                 right = AssumptionGraph(b.mult - 1, [assmp.copy() for assmp in b.assumptions])
 
+            # join unrolled iteration, possibly with remainder
+            # 1 * [A1, A2,.., An] (join) 1 * [B1, B2,.., Bm] =
+            # result, (left_remainder, right_remainder)
             one_a = AssumptionGraph(1, [assmp.copy() for assmp in a.assumptions])
             one_b = AssumptionGraph(1, [assmp.copy() for assmp in b.assumptions])
             res, rem = AssumptionGraph.join_helper(one_a, one_b)
-            # print(f"MULT {one_a}, {one_b} -> RES: {res}, REM: {rem}")
-            # print(f"RES -> {res}, REM -> {rem}")
+
             result = result + res
-            # print(f"left {left}, right {right}")
+
             if len(rem[0]) > 0:
                 left = AssumptionGraph(1, rem[0] + [left])
             if len(rem[1]) > 0:
-                # print(f"REM[1]: {rem[1]}, RIGHT: {right}")
                 right = AssumptionGraph(1, rem[1] + [right])
-                # print(f"right: {right}, after adding rem {rem[1]}")
-            # print("JOIN left right", left, right)
+
+            # unroll remainder of previous join and the remainder of the iterations
+            # 1 * [left_remainder, (N-1) * [A1, A2,.., An]] (join) 1 * [right_remainder,
+            # (M-1) * [B1, B2,.., Bm]]
             res, rem = AssumptionGraph.join_helper(left.copy(), right.copy())
-            # print(f"MULT2 {left}, {right} -> RES: {res}, REM: {rem}")
             result = result + res
             rem0 = rem[0] + remainder[0]
             rem1 = rem[1] + remainder[1]
             return result, (rem0, rem1)
 
     def easy_join(a, b):
+        
+
         res_mult = a.mult.min(b.mult)
         res_list = []
         for a1, b1 in zip(a.assumptions, b.assumptions):
